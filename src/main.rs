@@ -38,6 +38,7 @@ macro_rules! err_msg {
 pub struct MiscellaneousError(String);
 
 
+mod flagts;
 mod spwglue;
 
 
@@ -46,6 +47,7 @@ fn main() {
 
     process::exit(rubbl_core::notify::run_with_notifications(matches, |matches, nbe| -> Result<i32> {
         match matches.subcommand() {
+            ("flagts", Some(m)) => flagts::do_cli(m, nbe),
             ("spwglue", Some(m)) => spwglue::do_cli(m, nbe),
             (unknown, Some(_)) => {
                 return err_msg!("unrecognized sub-command \"{}\"", unknown);
@@ -67,5 +69,6 @@ fn make_app<'a, 'b>() -> App<'a, 'b> {
         .bin_name("rubbl rxpackage")
         .setting(AppSettings::DisableHelpSubcommand)
         .rubbl_notify_args()
+        .subcommand(flagts::make_app())
         .subcommand(spwglue::make_app())
 }
