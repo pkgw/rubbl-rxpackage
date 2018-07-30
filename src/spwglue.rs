@@ -67,12 +67,10 @@ mod mini_npy_parser {
         stream.read_exact(&mut header[..])?;
 
         let pyinfo = match map(&header) {
-            IResult::Done(_, info) => info,
-            IResult::Error(e) => {
+            Ok((_, info)) => info,
+
+            Err(e) => {
                 return err_msg!("failed to parse NPY Python header: {}", e);
-            },
-            IResult::Incomplete(_) => {
-                return err_msg!("failed to parse NPY Python header: incomplete data");
             },
         };
 
