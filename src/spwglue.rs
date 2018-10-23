@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 use clap::{App, Arg, ArgMatches, SubCommand};
@@ -1342,7 +1342,8 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
             use itertools::Itertools;
             use itertools::FoldWhile::{Continue, Done};
 
-            let mut meanbp = File::open(&meanbp_path)?;
+            let mut meanbp = ctry!(File::open(&meanbp_path);
+                                   "could not open meanbp file \"{}\"", meanbp_path.to_string_lossy());
             let mut arr: Array<f64, Ix1> = npy_stream_to_ndarray(&mut meanbp)?;
 
             if arr.iter().fold_while(false, |_acc, x| {
