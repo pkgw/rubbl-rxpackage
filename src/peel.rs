@@ -169,7 +169,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
             }
         });
 
-        let mut peel_data = main_data - work_data * work_model / work_corr + 10.0;
+        let mut peel_data = main_data - work_data * work_model / work_corr;
 
         // Not strictly necessary, maybe, but I think this is nice.
         Zip::from(&mut peel_data).and(&mut peel_flag).apply(|c, f| {
