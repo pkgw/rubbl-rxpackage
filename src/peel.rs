@@ -58,7 +58,7 @@ use std::path::Path;
 pub fn make_app<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("peel")
         .bin_name("rubbl rxpackage peel")
-        .about("Subtract a modeled source from a dataset")
+        .about("Model a source with source-specific calibration gain solutions")
         .arg(
             Arg::with_name("incremental")
                 .long("incremental")
@@ -66,7 +66,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
         )
         .arg(
             Arg::with_name("MAIN-TABLE")
-                .help("The path of the data set from which to subtract the source")
+                .help("The path of the data set into which to insert the source model")
                 .required(true)
                 .index(1),
         )
