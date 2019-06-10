@@ -35,12 +35,14 @@
 //!    work.ms:CORRECTED = G*work.ms:DATA = G(A_P + N) ~= A_I,
 //!    where the final equality is in some least-squares-type sense. Therefore
 //!    A_P ~= A_I / G ~= work.ms:MODEL * work.ms:DATA / work.ms:CORRECTED.
-//! 10. Finally, this tool comes into play. We want to subtract A_P out of
-//!     the main.ms data. Therefore, we have to fill in:
+//! 10. Finally, this tool comes into play. We'll want to subtract A_P out of
+//!     the main.ms data or otherwise model it. We can do this by inserting
+//!     the correct DD-perturbed model and then running uvsub:
 //!
-//!     main.ms:CORRECTED = main.ms:DATA - work.ms:MODEL * work.ms:DATA / work.ms:CORRECTED
+//!     main.ms:MODEL = work.ms:MODEL * work.ms:DATA / work.ms:CORRECTED
 //!
-//!     This tool iterates over the two datasets and performs this operation.
+//!     Or we can add to main.ms:MODEL to allow incremental change. This tool
+//!     iterates over the two datasets and performs this operation.
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use ndarray::{Ix2, Zip};
@@ -57,6 +59,11 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("peel")
         .bin_name("rubbl rxpackage peel")
         .about("Subtract a modeled source from a dataset")
+        .arg(
+            Arg::with_name("incremental")
+                .long("incremental")
+                .help("If specified, add the model to main:MODEL_DATA, rather than overwriting"),
+        )
         .arg(
             Arg::with_name("MAIN-TABLE")
                 .help("The path of the data set from which to subtract the source")
@@ -77,6 +84,8 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
     let workpath_os = matches.value_of_os("WORK-TABLE").unwrap();
     let workpath = Path::new(workpath_os).to_owned();
+
+    let incremental = matches.is_present("incremental");
 
     // Open up tables and do some checking.
 
@@ -111,22 +120,23 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
         return Ok(1);
     }
 
-    fn check_corrected(table: &mut Table, path: &Path) -> Result<()> {
+    fn check_one_col(table: &mut Table, path: &Path, colname: &str) -> Result<()> {
         let col_names = ctry!(table.column_names();
                               "failed to get names of columns in \"{}\"", path.display());
-        let mut seen_corrected = false;
+        let mut seen_col = false;
 
         for n in &col_names {
-            if n == "CORRECTED_DATA" {
-                seen_corrected = true;
+            if n == colname {
+                seen_col = true;
                 break;
             }
         }
 
-        if !seen_corrected {
+        if !seen_col {
             return err_msg!(
-                "CORRECTED_DATA column in table in \"{}\" \
+                "{} column in table in \"{}\" \
                  is required but missing",
+                colname,
                 path.display()
             );
         }
@@ -134,8 +144,8 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
         Ok(())
     }
 
-    check_corrected(&mut main_table, &mainpath)?;
-    check_corrected(&mut work_table, &workpath)?;
+    check_one_col(&mut main_table, &mainpath, "MODEL_DATA")?;
+    check_one_col(&mut work_table, &workpath, "CORRECTED_DATA")?;
 
     // Do the operation.
 
@@ -149,7 +159,6 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
         main_table.read_row(&mut main_row, row)?;
         work_table.read_row(&mut work_row, row)?;
 
-        let main_data: Array<Complex<f32>, Ix2> = main_row.get_cell("DATA")?;
         let main_flag: Array<bool, Ix2> = main_row.get_cell("FLAG")?;
         let work_data: Array<Complex<f32>, Ix2> = work_row.get_cell("DATA")?;
         let work_flag: Array<bool, Ix2> = work_row.get_cell("FLAG")?;
@@ -169,21 +178,29 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
             }
         });
 
-        let mut peel_data = main_data - work_data * work_model / work_corr;
+        let mut peel_model = work_data * work_model / work_corr;
 
         // Not strictly necessary, maybe, but I think this is nice.
-        Zip::from(&mut peel_data).and(&mut peel_flag).apply(|c, f| {
-            if !c.is_finite() {
-                *f = true;
-            }
+        Zip::from(&mut peel_model)
+            .and(&mut peel_flag)
+            .apply(|c, f| {
+                if !c.is_finite() {
+                    *f = true;
+                }
 
-            if *f {
-                *c = Complex::from(0.0);
-            }
-        });
+                if *f {
+                    *c = Complex::from(0.0);
+                }
+            });
 
         main_table.put_cell("FLAG", row, &peel_flag)?;
-        main_table.put_cell("CORRECTED_DATA", row, &peel_data)?;
+
+        if incremental {
+            let main_model: Array<Complex<f32>, Ix2> = main_row.get_cell("MODEL_DATA")?;
+            peel_model += &main_model;
+        }
+
+        main_table.put_cell("MODEL_DATA", row, &peel_model)?;
         pb.inc();
     }
 
