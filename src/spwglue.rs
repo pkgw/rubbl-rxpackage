@@ -6,8 +6,8 @@ use ndarray::{Ix1, Ix2};
 use num_traits::{Float, One, Signed, Zero};
 use pbr;
 use rubbl_casatables::{CasaDataType, CasaScalarData, Table, TableOpenMode, TableRow};
-use rubbl_core::{Array, Complex, Error, Result};
 use rubbl_core::notify::NotificationBackend;
+use rubbl_core::{Array, Complex, Error, Result};
 use std;
 use std::collections::HashMap;
 use std::default::Default;
@@ -19,7 +19,6 @@ use std::mem;
 use std::ops::{AddAssign, BitOrAssign, Range, Sub};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-
 
 // Quick .npy file parsing, stealing work from the `npy` crate version 0.3.2.
 
@@ -38,10 +37,12 @@ mod mini_npy_parser {
         Integer(i64),
         Bool(bool),
         List(Vec<LimitedPyLiteral>),
-        Map(HashMap<String,LimitedPyLiteral>),
+        Map(HashMap<String, LimitedPyLiteral>),
     }
 
-    pub fn npy_stream_to_ndarray<R: Read, D: Dimension + DimFromShapeSlice<u64>>(stream: &mut R) -> Result<Array<f64, D>> {
+    pub fn npy_stream_to_ndarray<R: Read, D: Dimension + DimFromShapeSlice<u64>>(
+        stream: &mut R,
+    ) -> Result<Array<f64, D>> {
         let mut preamble = [0u8; 10];
 
         stream.read_exact(&mut preamble)?;
@@ -63,7 +64,9 @@ mod mini_npy_parser {
         let aligned_len = ((header_len as usize + 10 + 15) / 16) * 16 - 10;
 
         let mut header = Vec::with_capacity(aligned_len);
-        unsafe { header.set_len(aligned_len); }
+        unsafe {
+            header.set_len(aligned_len);
+        }
         stream.read_exact(&mut header[..])?;
 
         let pyinfo = match map(&header) {
@@ -71,41 +74,56 @@ mod mini_npy_parser {
 
             Err(e) => {
                 return err_msg!("failed to parse NPY Python header: {}", e);
-            },
+            }
         };
 
         let pyinfo = match pyinfo {
             LimitedPyLiteral::Map(m) => m,
             other => {
-                return err_msg!("bad NPY Python header: expected toplevel map but got {:?}", other);
-            },
+                return err_msg!(
+                    "bad NPY Python header: expected toplevel map but got {:?}",
+                    other
+                );
+            }
         };
 
         let descr = match pyinfo.get("descr") {
             Some(&LimitedPyLiteral::String(ref s)) => s,
             other => {
-                return err_msg!("bad NPY Python header: expected string item \"descr\" but got {:?}", other);
-            },
+                return err_msg!(
+                    "bad NPY Python header: expected string item \"descr\" but got {:?}",
+                    other
+                );
+            }
         };
 
         let fortran_order = match pyinfo.get("fortran_order") {
             Some(&LimitedPyLiteral::Bool(b)) => b,
             other => {
-                return err_msg!("bad NPY Python header: expected bool item \"fortran_order\" but got {:?}", other);
-            },
+                return err_msg!(
+                    "bad NPY Python header: expected bool item \"fortran_order\" but got {:?}",
+                    other
+                );
+            }
         };
 
         let py_shape = match pyinfo.get("shape") {
             Some(&LimitedPyLiteral::List(ref ell)) => ell,
             other => {
-                return err_msg!("bad NPY Python header: expected list item \"shape\" but got {:?}", other);
-            },
+                return err_msg!(
+                    "bad NPY Python header: expected list item \"shape\" but got {:?}",
+                    other
+                );
+            }
         };
 
         // We could support more choices here ...
         if descr != "<f8" {
-            return err_msg!("unsupported NPY file: data type must be little-endian \
-                             f64 (\"<f8\") but got \"{}\"", descr);
+            return err_msg!(
+                "unsupported NPY file: data type must be little-endian \
+                 f64 (\"<f8\") but got \"{}\"",
+                descr
+            );
         }
 
         // ... and here.
@@ -119,10 +137,13 @@ mod mini_npy_parser {
             match py_shape_item {
                 &LimitedPyLiteral::Integer(i) => {
                     shape.push(i as u64);
-                },
+                }
                 other => {
-                    return err_msg!("bad NPY Python header: expected \"shape\" to be all integers but got {:?}", other);
-                },
+                    return err_msg!(
+                        "bad NPY Python header: expected \"shape\" to be all integers but got {:?}",
+                        other
+                    );
+                }
             }
         }
 
@@ -139,40 +160,39 @@ mod mini_npy_parser {
         Ok(arr)
     }
 
-    named!(item<LimitedPyLiteral>, alt!(integer | boolean | string | list | map));
+    named!(
+        item<LimitedPyLiteral>,
+        alt!(integer | boolean | string | list | map)
+    );
 
-    named!(integer<LimitedPyLiteral>,
+    named!(
+        integer<LimitedPyLiteral>,
         map!(
             map_res!(
-                map_res!(
-                    ws!(digit),
-                    ::std::str::from_utf8
-                ),
+                map_res!(ws!(digit), ::std::str::from_utf8),
                 ::std::str::FromStr::from_str
             ),
             LimitedPyLiteral::Integer
         )
     );
 
-    named!(boolean<LimitedPyLiteral>,
+    named!(
+        boolean<LimitedPyLiteral>,
         ws!(alt!(
             tag!("True") => { |_| LimitedPyLiteral::Bool(true) } |
             tag!("False") => { |_| LimitedPyLiteral::Bool(false) }
         ))
     );
 
-    named!(string<LimitedPyLiteral>,
+    named!(
+        string<LimitedPyLiteral>,
         map!(
             map!(
                 map_res!(
                     ws!(alt!(
-                        delimited!(tag!("\""),
-                            is_not_s!("\""),
-                            tag!("\"")) |
-                        delimited!(tag!("\'"),
-                            is_not_s!("\'"),
-                            tag!("\'"))
-                        )),
+                        delimited!(tag!("\""), is_not_s!("\""), tag!("\""))
+                            | delimited!(tag!("\'"), is_not_s!("\'"), tag!("\'"))
+                    )),
                     ::std::str::from_utf8
                 ),
                 |s: &str| s.to_string()
@@ -182,37 +202,52 @@ mod mini_npy_parser {
     );
 
     // Note that we do not distriguish between tuples and lists.
-    named!(list<LimitedPyLiteral>,
+    named!(
+        list<LimitedPyLiteral>,
         map!(
             ws!(alt!(
-                delimited!(tag!("["),
+                delimited!(
+                    tag!("["),
                     terminated!(separated_list!(tag!(","), item), alt!(tag!(",") | tag!(""))),
-                    tag!("]")) |
-                delimited!(tag!("("),
+                    tag!("]")
+                ) | delimited!(
+                    tag!("("),
                     terminated!(separated_list!(tag!(","), item), alt!(tag!(",") | tag!(""))),
-                    tag!(")"))
+                    tag!(")")
+                )
             )),
             LimitedPyLiteral::List
         )
     );
 
     // Note that we only allow string keys.
-    named!(map<LimitedPyLiteral>,
+    named!(
+        map<LimitedPyLiteral>,
         map!(
-            ws!(
-                delimited!(tag!("{"),
-                    terminated!(separated_list!(tag!(","),
-                        separated_pair!(map_opt!(string, |it| match it { LimitedPyLiteral::String(s) => Some(s), _ => None }), tag!(":"), item)
-                    ), alt!(tag!(",") | tag!(""))),
-                    tag!("}"))
-            ),
+            ws!(delimited!(
+                tag!("{"),
+                terminated!(
+                    separated_list!(
+                        tag!(","),
+                        separated_pair!(
+                            map_opt!(string, |it| match it {
+                                LimitedPyLiteral::String(s) => Some(s),
+                                _ => None,
+                            }),
+                            tag!(":"),
+                            item
+                        )
+                    ),
+                    alt!(tag!(",") | tag!(""))
+                ),
+                tag!("}")
+            )),
             |v: Vec<_>| LimitedPyLiteral::Map(v.into_iter().collect())
         )
     );
 }
 
 use self::mini_npy_parser::npy_stream_to_ndarray;
-
 
 /// Code for combining spw-associated quantities. We have to implement these
 /// as discrete types so that we can leverage Rust's generics. It's a bit of a
@@ -222,26 +257,43 @@ mod spw_table {
     use super::*;
 
     /// Columns handled by this struct are simply ignored.
-    struct IgnoreColumn<T> { _nope: PhantomData<T> }
+    struct IgnoreColumn<T> {
+        _nope: PhantomData<T>,
+    }
 
     impl<T> IgnoreColumn<T> {
-        pub fn new() -> Self { Self { _nope: PhantomData } }
+        pub fn new() -> Self {
+            Self { _nope: PhantomData }
+        }
 
-        pub fn process(&self, _src_table: &mut Table, _col_name: &str,
-                       _mappings: &[OutputSpwInfo], _dest_table: &mut Table) -> Result<()> {
+        pub fn process(
+            &self,
+            _src_table: &mut Table,
+            _col_name: &str,
+            _mappings: &[OutputSpwInfo],
+            _dest_table: &mut Table,
+        ) -> Result<()> {
             Ok(())
         }
     }
 
-
     /// Columns handled by this struct use the first value that appears.
-    struct UseFirstColumn<T: CasaScalarData> { _nope: PhantomData<T> }
+    struct UseFirstColumn<T: CasaScalarData> {
+        _nope: PhantomData<T>,
+    }
 
     impl<T: CasaScalarData> UseFirstColumn<T> {
-        pub fn new() -> Self { Self { _nope: PhantomData } }
+        pub fn new() -> Self {
+            Self { _nope: PhantomData }
+        }
 
-        pub fn process(&self, src_table: &mut Table, col_name: &str,
-                       mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<()> {
+        pub fn process(
+            &self,
+            src_table: &mut Table,
+            col_name: &str,
+            mappings: &[OutputSpwInfo],
+            dest_table: &mut Table,
+        ) -> Result<()> {
             let data = src_table.get_col_as_vec::<T>(col_name)?;
 
             for (i, mapping) in mappings.iter().enumerate() {
@@ -254,15 +306,23 @@ mod spw_table {
         }
     }
 
-
     /// In columns handled by this struct, every value must be the same.
-    struct MustMatchColumn<T: CasaScalarData> { _nope: PhantomData<T> }
+    struct MustMatchColumn<T: CasaScalarData> {
+        _nope: PhantomData<T>,
+    }
 
     impl<T: CasaScalarData + Display> MustMatchColumn<T> {
-        pub fn new() -> Self { Self { _nope: PhantomData } }
+        pub fn new() -> Self {
+            Self { _nope: PhantomData }
+        }
 
-        pub fn process(&self, src_table: &mut Table, col_name: &str,
-                       mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<()> {
+        pub fn process(
+            &self,
+            src_table: &mut Table,
+            col_name: &str,
+            mappings: &[OutputSpwInfo],
+            dest_table: &mut Table,
+        ) -> Result<()> {
             let data = src_table.get_col_as_vec::<T>(col_name)?;
 
             for (i, mapping) in mappings.iter().enumerate() {
@@ -283,16 +343,24 @@ mod spw_table {
         }
     }
 
-
     /// In columns handled by this struct, the cell values are scalars and the
     /// output is the sum of the inputs.
-    struct SumScalarColumn<T> { _nope: PhantomData<T> }
+    struct SumScalarColumn<T> {
+        _nope: PhantomData<T>,
+    }
 
     impl<T: CasaScalarData + AddAssign + Copy + Default> SumScalarColumn<T> {
-        pub fn new() -> Self { Self { _nope: PhantomData } }
+        pub fn new() -> Self {
+            Self { _nope: PhantomData }
+        }
 
-        pub fn process(&self, src_table: &mut Table, col_name: &str,
-                       mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<()> {
+        pub fn process(
+            &self,
+            src_table: &mut Table,
+            col_name: &str,
+            mappings: &[OutputSpwInfo],
+            dest_table: &mut Table,
+        ) -> Result<()> {
             let data = src_table.get_col_as_vec::<T>(col_name)?;
 
             for (i, mapping) in mappings.iter().enumerate() {
@@ -309,16 +377,27 @@ mod spw_table {
         }
     }
 
-
     /// In columns handled by this struct, the cell values are 1D vectors, and the
     /// output is the concatenation of all of the inputs.
-    struct ConcatVectorColumn<T: CasaScalarData> { _nope: PhantomData<T> }
+    struct ConcatVectorColumn<T: CasaScalarData> {
+        _nope: PhantomData<T>,
+    }
 
-    impl<T: CasaScalarData> ConcatVectorColumn<T> where Vec<T>: CasaDataType {
-        pub fn new() -> Self { Self { _nope: PhantomData } }
+    impl<T: CasaScalarData> ConcatVectorColumn<T>
+    where
+        Vec<T>: CasaDataType,
+    {
+        pub fn new() -> Self {
+            Self { _nope: PhantomData }
+        }
 
-        pub fn process(&self, src_table: &mut Table, col_name: &str,
-                       mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<()> {
+        pub fn process(
+            &self,
+            src_table: &mut Table,
+            col_name: &str,
+            mappings: &[OutputSpwInfo],
+            dest_table: &mut Table,
+        ) -> Result<()> {
             for (i, mapping) in mappings.iter().enumerate() {
                 let mut vec = Vec::<T>::new();
 
@@ -333,7 +412,6 @@ mod spw_table {
             Ok(())
         }
     }
-
 
     /// This macro creates the enum type that handles all of the possible
     /// columns that might appear in the SPECTRAL_WINDOW table. The enum type
@@ -392,7 +470,6 @@ mod spw_table {
         };
     }
 
-
     spectral_window_columns! {
         AssocNature(ASSOC_NATURE, IgnoreColumn, ()),
         AssocSpwId(ASSOC_SPW_ID, IgnoreColumn, ()),
@@ -414,7 +491,6 @@ mod spw_table {
         TotalBandwidth(TOTAL_BANDWIDTH, SumScalarColumn, f64)
     }
 
-
     // Quick wrapper type to avoid type visibility complaints
 
     pub struct WrappedSpectralWindowColumn(SpectralWindowColumn);
@@ -428,14 +504,18 @@ mod spw_table {
     }
 
     impl WrappedSpectralWindowColumn {
-        pub fn process(&self, src_table: &mut Table, mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<()> {
+        pub fn process(
+            &self,
+            src_table: &mut Table,
+            mappings: &[OutputSpwInfo],
+            dest_table: &mut Table,
+        ) -> Result<()> {
             self.0.process(src_table, mappings, dest_table)
         }
     }
 }
 
 use self::spw_table::WrappedSpectralWindowColumn as SpectralWindowColumn;
-
 
 type MaybeVisFactor = Option<Array<Complex<f32>, Ix1>>;
 
@@ -455,9 +535,14 @@ mod main_table {
             Self { value: None }
         }
 
-        fn process(&mut self, col_name: &str, _data_mapping: DataMappingKind,
-                   _in_spw: &InputSpwInfo, _out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _in_spw: &InputSpwInfo,
+            _out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             // Since this column helps define the record's identity, subsequent rows match the
             // first row by definition.
             if self.value.is_none() {
@@ -467,9 +552,14 @@ mod main_table {
             Ok(())
         }
 
-        fn emit(&self, col_name: &str, _data_mapping: DataMappingKind, _vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()>
-        {
+        fn emit(
+            &self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             if let Some(ref v) = self.value {
                 table.put_cell(col_name, row, v)?;
             }
@@ -481,7 +571,6 @@ mod main_table {
             self.value = None;
         }
     }
-
 
     /// This is kind of ridiculous, but I can't figure out a way to get a
     /// literal constant that's agnostic as to floating types, which stymies a
@@ -503,7 +592,9 @@ mod main_table {
     impl NeverImpledForVec for f32 {}
     impl NeverImpledForVec for f64 {}
 
-    impl<T: Float + One + NeverImpledForVec + PartialOrd + Signed + Sub + Zero> CheckApproximateMatch for T {
+    impl<T: Float + One + NeverImpledForVec + PartialOrd + Signed + Sub + Zero>
+        CheckApproximateMatch for T
+    {
         type Element = T;
 
         fn is_approximately_same(&self, other: &Self) -> bool {
@@ -547,7 +638,6 @@ mod main_table {
         }
     }
 
-
     /// Data in columns handled here must be *about* the same.
     ///
     /// This feature implemented since EVLA dataset
@@ -564,9 +654,14 @@ mod main_table {
             Self { value: None }
         }
 
-        fn process(&mut self, col_name: &str, _data_mapping: DataMappingKind,
-                   _in_spw: &InputSpwInfo, _out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _in_spw: &InputSpwInfo,
+            _out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             let cur = row.get_cell(col_name)?;
 
             if let Some(ref prev) = self.value {
@@ -574,7 +669,7 @@ mod main_table {
                     return err_msg!("column {} should be approximately constant across spws, but values changed", col_name);
                 }
             } else {
-                self.value =  Some(cur);
+                self.value = Some(cur);
             }
 
             Ok(())
@@ -582,9 +677,14 @@ mod main_table {
 
         // I tried to use a writeable output row for this, but I couldn't find a
         // way to leave the FLAG_CATEGORY column undefined.
-        fn emit(&self, col_name: &str, _data_mapping: DataMappingKind, _vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()>
-        {
+        fn emit(
+            &self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             if let Some(ref v) = self.value {
                 table.put_cell(col_name, row, v)?;
             }
@@ -597,34 +697,44 @@ mod main_table {
         }
     }
 
-
     /// The cells in this column are ignored and left empty in the output.
     #[derive(Clone, Debug, PartialEq)]
     struct EmptyColumn<T: CasaDataType> {
-        _nope: PhantomData<T>
+        _nope: PhantomData<T>,
     }
 
-    impl<T> EmptyColumn<Vec<T>> where Vec<T>: CasaDataType {
+    impl<T> EmptyColumn<Vec<T>>
+    where
+        Vec<T>: CasaDataType,
+    {
         fn new() -> Self {
             Self { _nope: PhantomData }
         }
 
-        fn process(&mut self, _col_name: &str, _data_mapping: DataMappingKind,
-                   _in_spw: &InputSpwInfo, _out_spw: &OutputSpwInfo, _row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            _col_name: &str,
+            _data_mapping: DataMappingKind,
+            _in_spw: &InputSpwInfo,
+            _out_spw: &OutputSpwInfo,
+            _row: &mut TableRow,
+        ) -> Result<()> {
             Ok(())
         }
 
-        fn emit(&self, _col_name: &str, _data_mapping: DataMappingKind, _vis_factor: &MaybeVisFactor,
-                _table: &mut Table, _row: u64) -> Result<()>
-        {
+        fn emit(
+            &self,
+            _col_name: &str,
+            _data_mapping: DataMappingKind,
+            _vis_factor: &MaybeVisFactor,
+            _table: &mut Table,
+            _row: u64,
+        ) -> Result<()> {
             Ok(())
         }
 
-        fn reset(&mut self) {
-        }
+        fn reset(&mut self) {}
     }
-
 
     /// The cells in this column are logically OR-ed together.
     #[derive(Clone, Debug, PartialEq)]
@@ -634,20 +744,32 @@ mod main_table {
 
     impl<T: CasaDataType + Default + BitOrAssign> LogicalOrColumn<T> {
         fn new() -> Self {
-            Self { value: T::default() }
+            Self {
+                value: T::default(),
+            }
         }
 
-        fn process(&mut self, col_name: &str, _data_mapping: DataMappingKind,
-                   _in_spw: &InputSpwInfo, _out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _in_spw: &InputSpwInfo,
+            _out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             let cur = row.get_cell(col_name)?;
             self.value |= cur;
             Ok(())
         }
 
-        fn emit(&self, col_name: &str, _data_mapping: DataMappingKind, _vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()>
-        {
+        fn emit(
+            &self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             Ok(table.put_cell(col_name, row, &self.value)?)
         }
 
@@ -656,19 +778,23 @@ mod main_table {
         }
     }
 
-
     /// The cells in this column are expected to be filled with 2D arrays that
     /// have a polarization and frequency axis. They are concatenated along
     /// the frequency axis.
     #[derive(Clone, Debug, PartialEq)]
     struct PolConcatColumn<T: CasaScalarData> {
-        buf: Array<T, Ix2>
+        buf: Array<T, Ix2>,
     }
 
-    fn process_pol_concat_record<T>(col_name: &str, in_spw: &InputSpwInfo,
-                                    out_spw: &OutputSpwInfo, row: &mut TableRow,
-                                    buf: &mut Array<T, Ix2>) -> Result<()>
-        where T: CasaScalarData + Copy + Default + Debug
+    fn process_pol_concat_record<T>(
+        col_name: &str,
+        in_spw: &InputSpwInfo,
+        out_spw: &OutputSpwInfo,
+        row: &mut TableRow,
+        buf: &mut Array<T, Ix2>,
+    ) -> Result<()>
+    where
+        T: CasaScalarData + Copy + Default + Debug,
     {
         let chunk: Array<T, Ix2> = row.get_cell(col_name)?;
 
@@ -682,29 +808,41 @@ mod main_table {
         }
 
         let c0 = in_spw.out_spw_offset() as isize;
-        buf.slice_mut(s![c0..c0+n_chunk_chan as isize, ..]).assign(&chunk);
+        buf.slice_mut(s![c0..c0 + n_chunk_chan as isize, ..])
+            .assign(&chunk);
 
         Ok(())
     }
 
     impl<T: CasaScalarData + Copy + Default + Debug> PolConcatColumn<T>
-        where Array<T, Ix2>: CasaDataType
+    where
+        Array<T, Ix2>: CasaDataType,
     {
         fn new() -> Self {
             Self {
-                buf: Array::default((0, 0))
+                buf: Array::default((0, 0)),
             }
         }
 
-        fn process(&mut self, col_name: &str, _data_mapping: DataMappingKind, in_spw: &InputSpwInfo,
-                   out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            in_spw: &InputSpwInfo,
+            out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             process_pol_concat_record(col_name, in_spw, out_spw, row, &mut self.buf)
         }
 
-        fn emit(&self, col_name: &str, _data_mapping: DataMappingKind, _vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()>
-        {
+        fn emit(
+            &self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             Ok(table.put_cell(col_name, row, &self.buf)?)
         }
 
@@ -712,7 +850,6 @@ mod main_table {
             // We live dangerously and don't de-initialize the buffer, for speed.
         }
     }
-
 
     /// This is just like PolConcatColumn, except for the DATA and MODEL_DATA
     /// columns. We ignore the contents if we're remapping CORRECTED_DATA to
@@ -731,13 +868,18 @@ mod main_table {
         fn new() -> Self {
             Self {
                 buf: Array::default((0, 0)),
-                _nope: PhantomData
+                _nope: PhantomData,
             }
         }
 
-        fn process(&mut self, col_name: &str, data_mapping: DataMappingKind, in_spw: &InputSpwInfo,
-                   out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            data_mapping: DataMappingKind,
+            in_spw: &InputSpwInfo,
+            out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             if let DataMappingKind::Correct = data_mapping {
                 return Ok(());
             }
@@ -745,8 +887,14 @@ mod main_table {
             process_pol_concat_record(col_name, in_spw, out_spw, row, &mut self.buf)
         }
 
-        fn emit(&mut self, col_name: &str, data_mapping: DataMappingKind, vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()> {
+        fn emit(
+            &mut self,
+            col_name: &str,
+            data_mapping: DataMappingKind,
+            vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             if let DataMappingKind::Correct = data_mapping {
                 return Ok(());
             }
@@ -758,10 +906,8 @@ mod main_table {
             Ok(table.put_cell(col_name, row, &self.buf)?)
         }
 
-        fn reset(&mut self) {
-        }
+        fn reset(&mut self) {}
     }
-
 
     /// This is just like PolConcatColumn, except for the CORRECTED_DATA
     /// column. If we're in "correct" mapping mode, we might write our
@@ -780,18 +926,29 @@ mod main_table {
         fn new() -> Self {
             Self {
                 buf: Array::default((0, 0)),
-                _nope: PhantomData
+                _nope: PhantomData,
             }
         }
 
-        fn process(&mut self, col_name: &str, _data_mapping: DataMappingKind, in_spw: &InputSpwInfo,
-                   out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            in_spw: &InputSpwInfo,
+            out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             process_pol_concat_record(col_name, in_spw, out_spw, row, &mut self.buf)
         }
 
-        fn emit(&mut self, col_name: &str, data_mapping: DataMappingKind, vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()> {
+        fn emit(
+            &mut self,
+            col_name: &str,
+            data_mapping: DataMappingKind,
+            vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             let final_col_name = match data_mapping {
                 DataMappingKind::Correct => "DATA",
                 _ => col_name,
@@ -804,10 +961,8 @@ mod main_table {
             Ok(table.put_cell(final_col_name, row, &self.buf)?)
         }
 
-        fn reset(&mut self) {
-        }
+        fn reset(&mut self) {}
     }
-
 
     /// The cells in this column contain 1D vectors that are averaged.
     #[derive(Clone, Debug, PartialEq)]
@@ -824,9 +979,14 @@ mod main_table {
             }
         }
 
-        fn process(&mut self, col_name: &str, _data_mapping: DataMappingKind,
-                   _in_spw: &InputSpwInfo, _out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        fn process(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _in_spw: &InputSpwInfo,
+            _out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             let chunk: Array<f32, Ix1> = row.get_cell(col_name)?;
 
             let n_chunk_pol = chunk.len();
@@ -841,9 +1001,14 @@ mod main_table {
             Ok(())
         }
 
-        fn emit(&mut self, col_name: &str, _data_mapping: DataMappingKind, _vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()>
-        {
+        fn emit(
+            &mut self,
+            col_name: &str,
+            _data_mapping: DataMappingKind,
+            _vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             self.buf /= self.n_contrib as f32;
             Ok(table.put_cell(col_name, row, &self.buf)?)
         }
@@ -853,7 +1018,6 @@ mod main_table {
             self.n_contrib = 0;
         }
     }
-
 
     /// This macro generates the column-handling enum for the main visibility
     /// data columns.
@@ -957,7 +1121,6 @@ mod main_table {
         Weight(WEIGHT, VecAverageColumn, f32)
     }
 
-
     // Quick wrapper type to avoid type visibility complaints
 
     #[derive(Clone, Debug, PartialEq)]
@@ -974,16 +1137,24 @@ mod main_table {
 
     impl WrappedVisDataColumn {
         #[inline(always)]
-        pub fn process(&mut self, data_mapping: DataMappingKind, in_spw: &InputSpwInfo,
-                       out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
-        {
+        pub fn process(
+            &mut self,
+            data_mapping: DataMappingKind,
+            in_spw: &InputSpwInfo,
+            out_spw: &OutputSpwInfo,
+            row: &mut TableRow,
+        ) -> Result<()> {
             self.0.process(data_mapping, in_spw, out_spw, row)
         }
 
         #[inline(always)]
-        pub fn emit(&mut self, data_mapping: DataMappingKind, vis_factor: &MaybeVisFactor,
-                    table: &mut Table, row: u64) -> Result<()>
-        {
+        pub fn emit(
+            &mut self,
+            data_mapping: DataMappingKind,
+            vis_factor: &MaybeVisFactor,
+            table: &mut Table,
+            row: u64,
+        ) -> Result<()> {
             self.0.emit(data_mapping, vis_factor, table, row)
         }
 
@@ -996,13 +1167,12 @@ mod main_table {
 
 use self::main_table::WrappedVisDataColumn as VisDataColumn;
 
-
 // DATA_DESC_ID is the one that we ignore because that encodes the SPW
 // information. TODO: POLARIZATION_ID is hidden in DATA_DESC_ID and we
 // could/should multiplex on that, but we currently hardcode a limitation to
 // just one POLARIZATION_ID anyway.
 
-#[derive(Clone,Debug,Eq,Hash,PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct VisRecordIdentity<T: Clone + Debug + Eq + Hash> {
     discriminant: T,
 
@@ -1049,9 +1219,8 @@ impl<T: Clone + Debug + Eq + Hash> VisRecordIdentity<T> {
     }
 }
 
-
 /// Information about an output spectral window.
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutputSpwInfo {
     in_spw0: usize,
     in_spw1: usize,
@@ -1108,11 +1277,10 @@ impl FromStr for OutputSpwInfo {
     }
 }
 
-
 /// Information about each *input* spw. We currently hardcode the limitation
 /// that each input spw can only appear in one output spw, which is something
 /// that we could in principle lift.
-#[derive(Clone,Debug,Eq,PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InputSpwInfo {
     out_spw: usize,
     offset: usize,
@@ -1135,7 +1303,6 @@ impl InputSpwInfo {
     }
 }
 
-
 /// Internal state of a partially-glued output spectral window.
 #[derive(Debug)]
 struct OutputRecordState<'a> {
@@ -1155,9 +1322,12 @@ impl<'a> OutputRecordState<'a> {
 
     /// Returns true if this row represents the final spectral window needed
     /// to complete this record.
-    pub fn process(&mut self, data_mapping: DataMappingKind,
-                   in_spw: &InputSpwInfo, row: &mut TableRow) -> Result<bool>
-    {
+    pub fn process(
+        &mut self,
+        data_mapping: DataMappingKind,
+        in_spw: &InputSpwInfo,
+        row: &mut TableRow,
+    ) -> Result<bool> {
         for col in &mut self.columns {
             col.process(data_mapping, in_spw, self.spw_info, row)?;
         }
@@ -1166,9 +1336,13 @@ impl<'a> OutputRecordState<'a> {
         Ok(self.n_input_spws_seen == self.spw_info.n_input_spws())
     }
 
-    pub fn emit(&mut self, data_mapping: DataMappingKind, vis_factor: &MaybeVisFactor,
-                table: &mut Table, row: u64) -> Result<()>
-    {
+    pub fn emit(
+        &mut self,
+        data_mapping: DataMappingKind,
+        vis_factor: &MaybeVisFactor,
+        table: &mut Table,
+        row: u64,
+    ) -> Result<()> {
         for col in &mut self.columns {
             col.emit(data_mapping, vis_factor, table, row)?;
         }
@@ -1187,7 +1361,6 @@ impl<'a> OutputRecordState<'a> {
         self
     }
 }
-
 
 /// Special mapping that we might apply to the three visibility data columns
 /// that might be present.
@@ -1212,57 +1385,69 @@ impl FromStr for DataMappingKind {
     }
 }
 
-
 // Let's get this show on the road.
 
 pub fn make_app<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("spwglue")
         .bin_name("rubbl rxpackage spwglue")
         .about("Glue together adjacent spectral windows in a CASA data set")
-        .arg(Arg::with_name("window")
-             .short("w")
-             .long("window")
-             .long_help("Define a glued spectral window that concatenates \
-                         input windows numbers N through M, inclusive. The \
-                         numbers are zero-based.")
-             .value_name("N-M")
-             .takes_value(true)
-             .number_of_values(1)
-             .required(true)
-             .multiple(true))
-        .arg(Arg::with_name("meanbp")
-             .long("meanbp")
-             .help("Path a .npy save file with mean bandpass")
-             .value_name("PATH")
-             .takes_value(true)
-             .number_of_values(1))
-        .arg(Arg::with_name("data_mapping")
-             .long("mapping")
-             .help("How to map the DATA/MODEL_DATA/CORRECTED_DATA columns in the output.")
-             .value_name("MAPPING")
-             .possible_values(&["passthrough", "correct"])
-             .default_value("passthrough"))
-        .arg(Arg::with_name("out_field")
-             .short("f")
-             .long("field")
-             .long_help("Output data from field FIELDNUM into file OUTPATH")
-             .value_name("FIELDNUM OUTPATH")
-             .takes_value(true)
-             .number_of_values(2)
-             .multiple(true))
-        .arg(Arg::with_name("out_default")
-             .short("D")
-             .long("default")
-             .long_help("Output any data not associated with a `-f` argument into file OUTPATH")
-             .value_name("OUTPATH")
-             .takes_value(true)
-             .number_of_values(1))
-        .arg(Arg::with_name("IN-TABLE")
-             .help("The path of the input data set")
-             .required(true)
-             .index(1))
+        .arg(
+            Arg::with_name("window")
+                .short("w")
+                .long("window")
+                .long_help(
+                    "Define a glued spectral window that concatenates \
+                     input windows numbers N through M, inclusive. The \
+                     numbers are zero-based.",
+                )
+                .value_name("N-M")
+                .takes_value(true)
+                .number_of_values(1)
+                .required(true)
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("meanbp")
+                .long("meanbp")
+                .help("Path a .npy save file with mean bandpass")
+                .value_name("PATH")
+                .takes_value(true)
+                .number_of_values(1),
+        )
+        .arg(
+            Arg::with_name("data_mapping")
+                .long("mapping")
+                .help("How to map the DATA/MODEL_DATA/CORRECTED_DATA columns in the output.")
+                .value_name("MAPPING")
+                .possible_values(&["passthrough", "correct"])
+                .default_value("passthrough"),
+        )
+        .arg(
+            Arg::with_name("out_field")
+                .short("f")
+                .long("field")
+                .long_help("Output data from field FIELDNUM into file OUTPATH")
+                .value_name("FIELDNUM OUTPATH")
+                .takes_value(true)
+                .number_of_values(2)
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("out_default")
+                .short("D")
+                .long("default")
+                .long_help("Output any data not associated with a `-f` argument into file OUTPATH")
+                .value_name("OUTPATH")
+                .takes_value(true)
+                .number_of_values(1),
+        )
+        .arg(
+            Arg::with_name("IN-TABLE")
+                .help("The path of the input data set")
+                .required(true)
+                .index(1),
+        )
 }
-
 
 pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32> {
     // Deal with args. The field mapping is awkward because clap doesn't
@@ -1302,7 +1487,10 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
                 }
 
                 if field_id_to_dest_index.insert(last_field_id, idx).is_some() {
-                    return err_msg!("field ID {} appears multiple times in field output arguments", last_field_id);
+                    return err_msg!(
+                        "field ID {} appears multiple times in field output arguments",
+                        last_field_id
+                    );
                 }
             }
 
@@ -1339,27 +1527,24 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
     let inv_sq_mean_bp = match matches.value_of_os("meanbp") {
         None => None,
         Some(meanbp_path) => {
-            use itertools::Itertools;
-            use itertools::FoldWhile::{Continue, Done};
-
             let mut meanbp = ctry!(File::open(&meanbp_path);
                                    "could not open meanbp file \"{}\"", meanbp_path.to_string_lossy());
             let mut arr: Array<f64, Ix1> = npy_stream_to_ndarray(&mut meanbp)?;
 
-            if arr.iter().fold_while(false, |_acc, x| {
-                if *x <= 0. {
-                    Done(true)
-                } else {
-                    Continue(false)
-                }
-            }).into_inner() {
-                return err_msg!("illegal bandpass file \"{}\": some values are nonpositive",
-                                meanbp_path.to_string_lossy());
+            if arr
+                .iter()
+                .try_fold((), |_acc, x| if *x > 0. { Some(()) } else { None })
+                .is_none()
+            {
+                return err_msg!(
+                    "illegal bandpass file \"{}\": some values are nonpositive",
+                    meanbp_path.to_string_lossy()
+                );
             }
 
             arr.mapv_inplace(|x| x.powi(-2));
             Some(arr.map(|x| Complex::new(*x as f32, 0.)))
-        },
+        }
     };
 
     let data_mapping: DataMappingKind = matches.value_of("data_mapping").unwrap().parse()?;
@@ -1375,7 +1560,11 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
             p.push(extension);
         }
 
-        let mode = if is_input { TableOpenMode::Read } else { TableOpenMode::ReadWrite };
+        let mode = if is_input {
+            TableOpenMode::Read
+        } else {
+            TableOpenMode::ReadWrite
+        };
 
         let t = ctry!(Table::open(&p, mode);
                       "failed to open {} {}table \"{}\"",
@@ -1405,8 +1594,11 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
     }
 
     if data_mapping == DataMappingKind::Correct && !seen_corrected {
-        return err_msg!("you asked to map CORRECTED_DATA to DATA, but \"{}\" \
-                         has no CORRECTED_DATA column", inpath.display());
+        return err_msg!(
+            "you asked to map CORRECTED_DATA to DATA, but \"{}\" \
+             has no CORRECTED_DATA column",
+            inpath.display()
+        );
     }
 
     // Copy the basic table structure.
@@ -1430,7 +1622,10 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
         let n_pol_types = in_pol_table.n_rows();
 
         if n_pol_types != 1 {
-            return err_msg!("input data set has {} \"POLARIZATION\" rows; I require exactly 1", n_pol_types);
+            return err_msg!(
+                "input data set has {} \"POLARIZATION\" rows; I require exactly 1",
+                n_pol_types
+            );
         }
 
         for dest in &destinations {
@@ -1452,8 +1647,11 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
         for m in &out_spws {
             if m.max_spw() >= n_in_spws as usize {
-                return err_msg!("you asked to map window #{} but the maximum number is {}",
-                                m.max_spw(), n_in_spws - 1);
+                return err_msg!(
+                    "you asked to map window #{} but the maximum number is {}",
+                    m.max_spw(),
+                    n_in_spws - 1
+                );
             }
         }
 
@@ -1462,7 +1660,8 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
         // Process everything into the first destination.
 
-        let (out_spw_path, mut out_spw_table) = open_table(&destinations[0], "SPECTRAL_WINDOW", false)?;
+        let (out_spw_path, mut out_spw_table) =
+            open_table(&destinations[0], "SPECTRAL_WINDOW", false)?;
 
         ctry!(out_spw_table.add_rows(out_spws.len());
               "failed to add {} rows to \"{}\"", out_spws.len(), out_spw_path.display());
@@ -1494,8 +1693,13 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
         if let Some(ref arr) = inv_sq_mean_bp {
             for (i, out_spw) in out_spws.iter().enumerate() {
                 if out_spw.num_chans != arr.len() {
-                    return err_msg!("all output spws must have {} channels to match the meanbp \
-                                     file, but #{} has {} channels", arr.len(), i, out_spw.num_chans);
+                    return err_msg!(
+                        "all output spws must have {} channels to match the meanbp \
+                         file, but #{} has {} channels",
+                        arr.len(),
+                        i,
+                        out_spw.num_chans
+                    );
                 }
             }
         }
@@ -1525,7 +1729,8 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
         // Process everything into first destination.
 
-        let (out_ddid_path, mut out_ddid_table) = open_table(&destinations[0], "DATA_DESCRIPTION", false)?;
+        let (out_ddid_path, mut out_ddid_table) =
+            open_table(&destinations[0], "DATA_DESCRIPTION", false)?;
 
         ctry!(out_ddid_table.add_rows(out_spws.len());
               "failed to add {} rows to \"{}\"", out_spws.len(), out_ddid_path.display());
@@ -1537,13 +1742,20 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
             let the_flag_row = flag_row[first_in_spw];
 
             if pol_id[first_in_spw] != 0 {
-                return err_msg!("consistency failure: expected POLARIZATION_ID[{}] = 0; got {}",
-                                first_in_spw, pol_id[first_in_spw]);
+                return err_msg!(
+                    "consistency failure: expected POLARIZATION_ID[{}] = 0; got {}",
+                    first_in_spw,
+                    pol_id[first_in_spw]
+                );
             }
 
             if spw_id[first_in_spw] as usize != first_in_spw {
-                return err_msg!("consistency failure: expected SPECTRAL_WINDOW_ID[{}] = {}; got {}",
-                                first_in_spw, first_in_spw, spw_id[first_in_spw]);
+                return err_msg!(
+                    "consistency failure: expected SPECTRAL_WINDOW_ID[{}] = {}; got {}",
+                    first_in_spw,
+                    first_in_spw,
+                    spw_id[first_in_spw]
+                );
             }
 
             // note: baking in assumption that DDID = SPWID (also done in insert call below)
@@ -1551,13 +1763,20 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
             for in_spw in spw_idx_iter {
                 if pol_id[in_spw] != 0 {
-                    return err_msg!("consistency failure: expected POLARIZATION_ID[{}] = 0; got {}",
-                                    in_spw, pol_id[in_spw]);
+                    return err_msg!(
+                        "consistency failure: expected POLARIZATION_ID[{}] = 0; got {}",
+                        in_spw,
+                        pol_id[in_spw]
+                    );
                 }
 
                 if spw_id[in_spw] as usize != in_spw {
-                    return err_msg!("consistency failure: expected SPECTRAL_WINDOW_ID[{}] = {}; got {}",
-                                    in_spw, in_spw, spw_id[in_spw]);
+                    return err_msg!(
+                        "consistency failure: expected SPECTRAL_WINDOW_ID[{}] = {}; got {}",
+                        in_spw,
+                        in_spw,
+                        spw_id[in_spw]
+                    );
                 }
 
                 ddid_to_in_spw_id.insert(in_spw, in_spw);
@@ -1565,7 +1784,11 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
             out_ddid_table.put_cell("FLAG_ROW", out_spw_idx as u64, &the_flag_row)?;
             out_ddid_table.put_cell("POLARIZATION_ID", out_spw_idx as u64, &0i32)?;
-            out_ddid_table.put_cell("SPECTRAL_WINDOW_ID", out_spw_idx as u64, &(out_spw_idx as i32))?;
+            out_ddid_table.put_cell(
+                "SPECTRAL_WINDOW_ID",
+                out_spw_idx as u64,
+                &(out_spw_idx as i32),
+            )?;
         }
 
         // Now propagate into remaining destinations (if any).
@@ -1725,13 +1948,13 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
 
     for kw_name in &table_kw_names {
         match kw_name.as_str() {
-            "CALDEVICE" => {},
-            "DATA_DESCRIPTION" => {},
-            "FEED" => {},
-            "POLARIZATION" => {},
-            "SOURCE" => {},
-            "SPECTRAL_WINDOW" => {},
-            "SYSPOWER" => {}, // large and my pipeline pre-applies it!
+            "CALDEVICE" => {}
+            "DATA_DESCRIPTION" => {}
+            "FEED" => {}
+            "POLARIZATION" => {}
+            "SOURCE" => {}
+            "SPECTRAL_WINDOW" => {}
+            "SYSPOWER" => {} // large and my pipeline pre-applies it!
             n => {
                 let (_, mut in_misc_table) = open_table(&inpath, n, true)?;
 
@@ -1739,7 +1962,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
                     let (_, mut out_misc_table) = open_table(dest, n, false)?;
                     in_misc_table.copy_rows_to(&mut out_misc_table)?;
                 }
-            },
+            }
         }
     }
 
@@ -1765,7 +1988,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
         out_tables.push(DestinationRecord {
             path: dest,
             table: t,
-            num_rows: 0
+            num_rows: 0,
         });
     }
 
@@ -1840,8 +2063,11 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
     // All done!
 
     if records_in_progress.len() != 0 {
-        rn_severe!(nbe, "there were {} unfinished records left over at the end",
-                   records_in_progress.len());
+        rn_severe!(
+            nbe,
+            "there were {} unfinished records left over at the end",
+            records_in_progress.len()
+        );
     }
 
     pb.finish();
