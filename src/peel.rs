@@ -20,7 +20,9 @@
 //! 4. You use `ft` to fill main.ms:MODEL with the "allbutA" model; so
 //!    main.ms:MODEL = S, to the best of our abilities.
 //! 5. You use `uvsub` to fill main.ms:CORRECTED with the difference between
-//!    the two: main.ms:CORRECTED = A_P + N
+//!    the two: main.ms:CORRECTED = A_P + N. (**Note:** `uvsub` actually
+//!    subtracts MODEL from CORRECTED, so to do this incrementally, you have
+//!    to make sure to delete CORRECTED or reset it to DATA first.)
 //! 6. You use `split` to create work.ms:DATA, equal to main.ms:CORRECTED =
 //!    A_P + N.
 //! 7. You use fill work.ms:MODEL with an idealized model of source A. This
