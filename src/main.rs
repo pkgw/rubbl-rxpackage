@@ -59,6 +59,7 @@ fn main() {
                 (_, None) => {
                     // No sub-command provided.
                     make_app().print_long_help()?;
+                    println!(); // print_long_help seems to not add a final newline?
                     Ok(0)
                 }
             }
