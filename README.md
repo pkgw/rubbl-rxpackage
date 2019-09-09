@@ -9,7 +9,7 @@ Rust provides the speed of C++ but massively improved ergonomics.
 
 [rubbl]: https://github.com/pkgw/rubbl
 
-The name `rxpackage` is my shorthard for “[data] reduction package”.
+The name `rxpackage` is my shorthand for “[data] reduction package”.
 
 
 ## Available tools
@@ -57,7 +57,7 @@ In particular:
 - The best citation for *the software itself* is to refer to release archives
   that are stored on [Zenodo]. The pseudo-DOI [10.5281/zenodo.3403263] should
   not be used itself, but will resolve to the latest available version of the
-  software, which is probably what you used. At the moment, you must then
+  software, which is hopefully what you used. At the moment, you must then
   construct a BibTeX entry; here is one for version 0.1.0:
   ```
   @misc{rubbl_rxpackage_0.1.0, % NOTE: different versions will have different data!
@@ -95,7 +95,7 @@ In particular:
   ```
 - There is nothing wrong with linking to this software’s GitHub repository for
   completeness, but such a link does not have long-term archival guarantees
-  and is not “dereferenceable”.
+  and is not “dereferenceable” by metadata tools.
 - Adding everything up, in a gold-standard publication you might write:
   ```
   The open-source software package
