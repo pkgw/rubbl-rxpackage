@@ -8,8 +8,8 @@ use itertools::Itertools;
 use ndarray::Ix2;
 use pbr;
 use rubbl_casatables::{Table, TableOpenMode};
-use rubbl_core::{Array, Result};
 use rubbl_core::notify::NotificationBackend;
+use rubbl_core::{Array, Result};
 use std;
 use std::collections::HashMap;
 use std::f64;
@@ -17,17 +17,17 @@ use std::io;
 use std::mem;
 use std::path::{Path, PathBuf};
 
-
 pub fn make_app<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("flagts")
         .bin_name("rubbl rxpackage flagts")
         .about("Print a time series of flagging fractions")
-        .arg(Arg::with_name("IN-TABLE")
-             .help("The path of the input data set")
-             .required(true)
-             .index(1))
+        .arg(
+            Arg::with_name("IN-TABLE")
+                .help("The path of the input data set")
+                .required(true)
+                .index(1),
+        )
 }
-
 
 pub fn do_cli(matches: &ArgMatches, _nbe: &mut NotificationBackend) -> Result<i32> {
     // Deal with args.
@@ -46,7 +46,11 @@ pub fn do_cli(matches: &ArgMatches, _nbe: &mut NotificationBackend) -> Result<i3
             p.push(extension);
         }
 
-        let mode = if is_input { TableOpenMode::Read } else { TableOpenMode::ReadWrite };
+        let mode = if is_input {
+            TableOpenMode::Read
+        } else {
+            TableOpenMode::ReadWrite
+        };
 
         let t = ctry!(Table::open(&p, mode);
                       "failed to open {} {}table \"{}\"",
@@ -78,7 +82,13 @@ pub fn do_cli(matches: &ArgMatches, _nbe: &mut NotificationBackend) -> Result<i3
         let recast_time: u64 = unsafe { mem::transmute(time) };
 
         if !records.contains_key(&recast_time) {
-            records.insert(recast_time, TimeslotInfo { n_total: 0, n_flagged: 0 });
+            records.insert(
+                recast_time,
+                TimeslotInfo {
+                    n_total: 0,
+                    n_flagged: 0,
+                },
+            );
         }
 
         let state = records.get_mut(&recast_time).unwrap();
@@ -108,9 +118,18 @@ pub fn do_cli(matches: &ArgMatches, _nbe: &mut NotificationBackend) -> Result<i3
             t0 = time;
         }
 
-        println!("{:.16e} {:.16e} {} {}", time, time - t0, state.n_total, state.n_flagged);
+        println!(
+            "{:.16e} {:.16e} {} {}",
+            time,
+            time - t0,
+            state.n_total,
+            state.n_flagged
+        );
     }
 
-    pb.finish_println(&format!("Computed flag stats for {} timeslots", records.len()));
+    pb.finish_println(&format!(
+        "Computed flag stats for {} timeslots",
+        records.len()
+    ));
     Ok(0)
 }
