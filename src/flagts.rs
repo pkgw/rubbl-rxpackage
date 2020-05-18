@@ -29,7 +29,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
         )
 }
 
-pub fn do_cli(matches: &ArgMatches, _nbe: &mut NotificationBackend) -> Result<i32> {
+pub fn do_cli(matches: &ArgMatches, _nbe: &mut dyn NotificationBackend) -> Result<i32> {
     // Deal with args.
 
     let inpath_os = matches.value_of_os("IN-TABLE").unwrap();

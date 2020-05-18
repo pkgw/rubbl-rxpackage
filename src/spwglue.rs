@@ -1449,7 +1449,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
         )
 }
 
-pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32> {
+pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
     // Deal with args. The field mapping is awkward because clap doesn't
     // distinguish between multiple appearances of the same option; `-f A
     // B C -f D` is just returned to us as a list [A B C D]. Therefore to
