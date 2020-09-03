@@ -1,0 +1,28 @@
+# Deployment pipeline, run when all CI tests pass on `rc`
+
+steps:
+- bash: |
+    git add .
+    cranko release-workflow commit
+    git show
+  displayName: Generate release commit
+
+- bash: |
+    cranko github install-credential-helper
+    cranko release-workflow tag
+    git push --tags origin release:release
+  displayName: Tag and push release branch
+  env:
+    GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+# - bash: |
+#     cranko cargo foreach-released publish
+#   displayName: Publish updated Cargo crates
+#   env:
+#     CARGO_REGISTRY_TOKEN: $(CARGO_REGISTRY_TOKEN)
+
+- bash: |
+    cranko github create-releases
+  displayName: Create GitHub releases
+  env:
+    GITHUB_TOKEN: $(GITHUB_TOKEN)

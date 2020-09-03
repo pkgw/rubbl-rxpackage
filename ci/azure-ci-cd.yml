@@ -1,0 +1,56 @@
+# Main pipeline spec for CI/CD on Azure Pipelines.
+
+trigger:
+  branches:
+    include:
+    - master
+    - rc
+
+jobs:
+- job: Linux
+  pool:
+    vmImage: ubuntu-20.04
+
+  # Deployment creds included unconditionally in this simple workflow; secrets
+  # will be withheld in PR builds.
+  variables:
+  - group: Deployment Credentials
+  - name: TOOLCHAIN
+    value: stable
+
+  steps:
+  - bash: |
+      set -ex
+      rustup set profile minimal
+      rustup component remove --toolchain=$TOOLCHAIN rust-docs || echo "already removed"
+      rustup update --no-self-update $TOOLCHAIN
+      rustup default $TOOLCHAIN
+      # Log versions for posterity:
+      rustup -V
+      rustc -Vv
+      cargo -V
+    displayName: Select Rust toolchain
+
+  - bash: |
+      d="$(mktemp --tmpdir -d cranko.XXXXXX)"
+      cd "$d"
+      curl --proto '=https' --tlsv1.2 -sSf https://pkgw.github.io/cranko/fetch-latest.sh | sh
+      echo "##vso[task.prependpath]$d"
+    displayName: Install latest Cranko
+
+  - bash: |
+      cranko release-workflow apply-versions
+    displayName: Apply versions
+
+  - bash: |
+      cargo build --all
+      cargo test --all
+    displayName: Build and test
+
+  - bash: |
+      git status
+      git diff
+    displayName: Show cranko release edits
+
+  - ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+    - template: azure-deployment.yml
