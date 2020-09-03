@@ -40,6 +40,19 @@ got the core `rubbl` command installed, the tools should also be accessible by
 running `rubbl rxpackage`.
 
 
+## Versioning
+
+When you check out the main branch, you might notice that everything is built
+with version `0.0.0`. This is because this project uses the [just-in-time
+versioning][jitv] workflow as implemented by [Cranko]. Version numbers are
+assigned inside the CI/CD pipeline. See [the GitHub release
+history][gh-releases] for release history and changelogs.
+
+[jitv]: https://pkgw.github.io/cranko/book/latest/jit-versioning/
+[Cranko]: https://pkgw.github.io/cranko/book/latest/
+[gh-releases]: https://github.com/pkgw/rubbl-rxpackage/releases
+
+
 ## Citation
 
 If you use this software in academic work, you must cite it appropriately in
