@@ -26,6 +26,7 @@ mod mini_npy_parser {
     use super::*;
     use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
     use ndarray::{Array, Dimension};
+    use nom::character::complete::digit1;
     use nom::*;
     use rubbl_core::num::DimFromShapeSlice;
     use std::collections::HashMap;
@@ -169,7 +170,7 @@ mod mini_npy_parser {
         integer<LimitedPyLiteral>,
         map!(
             map_res!(
-                map_res!(ws!(digit), ::std::str::from_utf8),
+                map_res!(ws!(digit1), ::std::str::from_utf8),
                 ::std::str::FromStr::from_str
             ),
             LimitedPyLiteral::Integer
@@ -190,8 +191,8 @@ mod mini_npy_parser {
             map!(
                 map_res!(
                     ws!(alt!(
-                        delimited!(tag!("\""), is_not_s!("\""), tag!("\""))
-                            | delimited!(tag!("\'"), is_not_s!("\'"), tag!("\'"))
+                        delimited!(tag!("\""), is_not!("\""), tag!("\""))
+                            | delimited!(tag!("\'"), is_not!("\'"), tag!("\'"))
                     )),
                     ::std::str::from_utf8
                 ),
@@ -1449,7 +1450,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
         )
 }
 
-pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32> {
+pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
     // Deal with args. The field mapping is awkward because clap doesn't
     // distinguish between multiple appearances of the same option; `-f A
     // B C -f D` is just returned to us as a list [A B C D]. Therefore to
@@ -1670,8 +1671,17 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32
             let handler = ctry!(n.parse::<SpectralWindowColumn>();
                                 "unhandled column \"{}\" in input sub-table \"{}\"",
                                 n, in_spw_path.display());
-            ctry!(handler.process(&mut in_spw_table, &out_spws, &mut out_spw_table);
-                  "failed to fill output sub-table \"{}\"", out_spw_path.display());
+
+            // A little hack aiming to provide more helpful error reporting ..
+            let result = handler.process(&mut in_spw_table, &out_spws, &mut out_spw_table);
+            let mut spw_hint = "";
+            if let Err(ref e) = result {
+                if e.to_string().contains("value changed") {
+                    spw_hint = "; are your spectral window specifications correct?";
+                }
+            }
+
+            ctry!(result; "failed to fill output sub-table \"{}\"{}", out_spw_path.display(), spw_hint);
 
             if n == "NUM_CHAN" {
                 // A bit inefficient since we reread the column but whatever.

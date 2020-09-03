@@ -2,12 +2,6 @@
 
 steps:
 - bash: |
-    git add .
-    cranko release-workflow commit
-    git show
-  displayName: Generate release commit
-
-- bash: |
     cranko github install-credential-helper
     cranko release-workflow tag
     git push --tags origin release:release
@@ -23,6 +17,7 @@ steps:
 
 - bash: |
     cranko github create-releases
+    cranko github upload-artifacts rubbl-rxpackage $(Build.ArtifactStagingDirectory)/binaries/*
   displayName: Create GitHub releases
   env:
     GITHUB_TOKEN: $(GITHUB_TOKEN)
