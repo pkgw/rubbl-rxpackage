@@ -2,12 +2,6 @@
 
 steps:
 - bash: |
-    git add .
-    cranko release-workflow commit
-    git show
-  displayName: Generate release commit
-
-- bash: |
     cranko github install-credential-helper
     cranko release-workflow tag
     git push --tags origin release:release

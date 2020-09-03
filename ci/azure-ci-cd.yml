@@ -50,15 +50,18 @@ jobs:
     displayName: Build and test
 
   - bash: |
+      set -xeuo pipefail
       git status
-      git diff
-    displayName: Show cranko release edits
+      git add .
+      cranko release-workflow commit
+      git show
+    displayName: Generate release commit
 
   - bash: |
       artifact_dir="$(Build.ArtifactStagingDirectory)/binaries"
       mkdir -p "$artifact_dir"
       cranko cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
-    displayName: "Package binaries"
+    displayName: Package binaries
 
   - task: PublishPipelineArtifact@1
     displayName: Publish packaged binary artifacts
