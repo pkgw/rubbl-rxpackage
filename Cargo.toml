@@ -1,6 +1,6 @@
 [package]
 name = "rubbl-rxpackage"
-version = "0.1.0"  # also update CITATION.cff, README.md
+version = "0.0.0-dev.0"  # managed with Cranko; see README
 authors = ["Peter Williams <peter@newton.cx>"]
 
 [dependencies]
