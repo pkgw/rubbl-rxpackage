@@ -17,6 +17,8 @@ jobs:
   - group: Deployment Credentials
   - name: TOOLCHAIN
     value: stable
+  - name: TARGET
+    value: x86_64-unknown-linux-gnu
 
   steps:
   - bash: |
@@ -43,14 +45,26 @@ jobs:
     displayName: Apply versions
 
   - bash: |
-      cargo build --all
-      cargo test --all
+      cargo build --all --release
+      cargo test --all --release
     displayName: Build and test
 
   - bash: |
       git status
       git diff
     displayName: Show cranko release edits
+
+  - bash: |
+      artifact_dir="$(Build.ArtifactStagingDirectory)/binaries"
+      mkdir -p "$artifact_dir"
+      cranko cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
+    displayName: "Package binaries"
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish packaged binary artifacts
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/binaries'
+      artifactName: binaries
 
   - ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
     - template: azure-deployment.yml
