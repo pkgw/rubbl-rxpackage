@@ -1,7 +1,6 @@
-# See GitHub for changelog
+# rc: force 0.1.1
 
-Changelogs for this project are curated from the Git history of its main branch.
-You can find them by looking at the `release` branch or the project's [GitHub
-release history][releases].
-
-[releases]: https://github.com/pkgw/rubbl-rxpackage/releases
+- Add a Cranko-based CI/CD pipeline
+- Tiny doc updates
+- Not publishing to Crates.io
+ 
