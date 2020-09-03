@@ -26,6 +26,7 @@ mod mini_npy_parser {
     use super::*;
     use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
     use ndarray::{Array, Dimension};
+    use nom::character::complete::digit1;
     use nom::*;
     use rubbl_core::num::DimFromShapeSlice;
     use std::collections::HashMap;
@@ -169,7 +170,7 @@ mod mini_npy_parser {
         integer<LimitedPyLiteral>,
         map!(
             map_res!(
-                map_res!(ws!(digit), ::std::str::from_utf8),
+                map_res!(ws!(digit1), ::std::str::from_utf8),
                 ::std::str::FromStr::from_str
             ),
             LimitedPyLiteral::Integer
@@ -190,8 +191,8 @@ mod mini_npy_parser {
             map!(
                 map_res!(
                     ws!(alt!(
-                        delimited!(tag!("\""), is_not_s!("\""), tag!("\""))
-                            | delimited!(tag!("\'"), is_not_s!("\'"), tag!("\'"))
+                        delimited!(tag!("\""), is_not!("\""), tag!("\""))
+                            | delimited!(tag!("\'"), is_not!("\'"), tag!("\'"))
                     )),
                     ::std::str::from_utf8
                 ),
@@ -1449,7 +1450,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
         )
 }
 
-pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32> {
+pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
     // Deal with args. The field mapping is awkward because clap doesn't
     // distinguish between multiple appearances of the same option; `-f A
     // B C -f D` is just returned to us as a list [A B C D]. Therefore to
