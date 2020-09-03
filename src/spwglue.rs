@@ -1671,8 +1671,17 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
             let handler = ctry!(n.parse::<SpectralWindowColumn>();
                                 "unhandled column \"{}\" in input sub-table \"{}\"",
                                 n, in_spw_path.display());
-            ctry!(handler.process(&mut in_spw_table, &out_spws, &mut out_spw_table);
-                  "failed to fill output sub-table \"{}\"", out_spw_path.display());
+
+            // A little hack aiming to provide more helpful error reporting ..
+            let result = handler.process(&mut in_spw_table, &out_spws, &mut out_spw_table);
+            let mut spw_hint = "";
+            if let Err(ref e) = result {
+                if e.to_string().contains("value changed") {
+                    spw_hint = "; are your spectral window specifications correct?";
+                }
+            }
+
+            ctry!(result; "failed to fill output sub-table \"{}\"{}", out_spw_path.display(), spw_hint);
 
             if n == "NUM_CHAN" {
                 // A bit inefficient since we reread the column but whatever.
