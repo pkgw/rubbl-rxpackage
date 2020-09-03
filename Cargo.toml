@@ -1,6 +1,6 @@
 [package]
 name = "rubbl-rxpackage"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Peter Williams <peter@newton.cx>"]
 
 [dependencies]
@@ -10,7 +10,7 @@ failure = "^0.1"
 failure_derive = "^0.1"
 itertools = "^0.8"
 ndarray = "^0.12"
-nom = "^4"
+nom = "^5"
 num-traits = "^0.2"
 pbr = "^1.0"
 rubbl_casatables = "^0.1.4"

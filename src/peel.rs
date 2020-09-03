@@ -80,7 +80,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
         )
 }
 
-pub fn do_cli(matches: &ArgMatches, nbe: &mut NotificationBackend) -> Result<i32> {
+pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
     let mainpath_os = matches.value_of_os("MAIN-TABLE").unwrap();
     let mainpath = Path::new(mainpath_os).to_owned();
 
