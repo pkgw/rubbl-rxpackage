@@ -149,17 +149,17 @@ mod mini_npy_parser {
             }
         }
 
-        let mut arr = unsafe { Array::uninitialized(D::from_shape_slice(&shape)?) };
+        let mut arr = Array::uninit(D::from_shape_slice(&shape)?);
 
         // Note: we "should" probably use a BufReader here, but the
         // performance of this bit is totally insignificant in the grand
         // scheme of things.
 
         for item in arr.iter_mut() {
-            *item = stream.read_f64::<LittleEndian>()?;
+            *item = std::mem::MaybeUninit::new(stream.read_f64::<LittleEndian>()?);
         }
 
-        Ok(arr)
+        Ok(unsafe { arr.assume_init() })
     }
 
     named!(

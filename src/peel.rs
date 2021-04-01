@@ -168,22 +168,24 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
         let mut peel_flag = main_flag | work_flag;
 
         // Avoid div-by-zero.
-        Zip::from(&mut work_corr).and(&mut peel_flag).apply(|c, f| {
-            if c.norm() == 0. {
-                *f = true;
-            }
+        Zip::from(&mut work_corr)
+            .and(&mut peel_flag)
+            .for_each(|c, f| {
+                if c.norm() == 0. {
+                    *f = true;
+                }
 
-            if *f {
-                *c = Complex::from(1.0);
-            }
-        });
+                if *f {
+                    *c = Complex::from(1.0);
+                }
+            });
 
         let mut peel_model = work_data * work_model / work_corr;
 
         // Not strictly necessary, maybe, but I think this is nice.
         Zip::from(&mut peel_model)
             .and(&mut peel_flag)
-            .apply(|c, f| {
+            .for_each(|c, f| {
                 if !c.is_finite() {
                     *f = true;
                 }
