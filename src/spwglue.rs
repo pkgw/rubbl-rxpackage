@@ -1,24 +1,25 @@
-// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use ndarray::{Ix1, Ix2};
+use ndarray::{s, Ix1, Ix2};
 use num_traits::{Float, One, Signed, Zero};
 use pbr;
 use rubbl_casatables::{CasaDataType, CasaScalarData, Table, TableOpenMode, TableRow};
-use rubbl_core::notify::NotificationBackend;
-use rubbl_core::{Array, Complex, Error, Result};
-use std;
-use std::collections::HashMap;
-use std::default::Default;
-use std::fmt::{Debug, Display};
-use std::fs::File;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::mem;
-use std::ops::{AddAssign, BitOrAssign, Range, Sub};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use rubbl_core::{ctry, notify::NotificationBackend, rn_severe, Array, Complex, Error, Result};
+use std::{
+    self,
+    collections::HashMap,
+    default::Default,
+    fmt::{Debug, Display},
+    fs::File,
+    hash::Hash,
+    marker::PhantomData,
+    mem,
+    ops::{AddAssign, BitOrAssign, Range, Sub},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 // Quick .npy file parsing, stealing work from the `npy` crate version 0.3.2.
 

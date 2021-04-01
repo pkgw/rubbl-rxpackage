@@ -1,31 +1,14 @@
-// Copyright 2017-2019 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
-/*! The "rubbl rxpackage" command
+//! The "rubbl rxpackage" command
+//!
+//! This provides swiss-army-knife access to various tasks that my reduction
+//! scripts need that are implemented in the Rubbl framework.
 
-This provides swiss-army-knife access to various tasks that my reduction
-scripts need that are implemented in the Rubbl framework.
-
-*/
-
-extern crate byteorder;
-#[macro_use]
-extern crate clap;
-extern crate failure;
-extern crate failure_derive;
-extern crate itertools;
-#[macro_use]
-extern crate ndarray;
-extern crate nom;
-extern crate num_traits;
-extern crate pbr;
-extern crate rubbl_casatables;
-#[macro_use]
-extern crate rubbl_core;
-
-use clap::{App, AppSettings};
-use rubbl_core::notify::ClapNotificationArgsExt;
-use rubbl_core::Result;
+use clap::{crate_version, App, AppSettings};
+use failure::Fail;
+use rubbl_core::{notify::ClapNotificationArgsExt, Result};
 use std::process;
 
 // Define this before the submodules are parsed.

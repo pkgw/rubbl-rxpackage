@@ -1,4 +1,4 @@
-// Copyright 2019 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2019-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 //! Peeling!
@@ -50,10 +50,8 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use ndarray::{Ix2, Zip};
 use pbr;
 use rubbl_casatables::{Table, TableOpenMode};
-use rubbl_core::notify::NotificationBackend;
-use rubbl_core::{Array, Complex, Result};
-use std;
-use std::path::Path;
+use rubbl_core::{ctry, notify::NotificationBackend, rn_fatal, Array, Complex, Result};
+use std::{self, path::Path};
 
 // Let's get this show on the road.
 
