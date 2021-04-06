@@ -1,21 +1,20 @@
-// Copyright 2018 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2018-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
-/*! Generate a time series of flagging percentages for a data set. */
+//! Generate a time series of flagging percentages for a data set.
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use itertools::Itertools;
 use ndarray::Ix2;
 use pbr;
 use rubbl_casatables::{Table, TableOpenMode};
-use rubbl_core::notify::NotificationBackend;
-use rubbl_core::{Array, Result};
-use std;
-use std::collections::HashMap;
-use std::f64;
-use std::io;
-use std::mem;
-use std::path::{Path, PathBuf};
+use rubbl_core::{ctry, notify::NotificationBackend, Array, Result};
+use std::{
+    self,
+    collections::HashMap,
+    f64, io, mem,
+    path::{Path, PathBuf},
+};
 
 pub fn make_app<'a, 'b>() -> App<'a, 'b> {
     SubCommand::with_name("flagts")
