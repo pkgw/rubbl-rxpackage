@@ -1,24 +1,25 @@
-// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use ndarray::{Ix1, Ix2};
+use ndarray::{s, Ix1, Ix2};
 use num_traits::{Float, One, Signed, Zero};
 use pbr;
 use rubbl_casatables::{CasaDataType, CasaScalarData, Table, TableOpenMode, TableRow};
-use rubbl_core::notify::NotificationBackend;
-use rubbl_core::{Array, Complex, Error, Result};
-use std;
-use std::collections::HashMap;
-use std::default::Default;
-use std::fmt::{Debug, Display};
-use std::fs::File;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::mem;
-use std::ops::{AddAssign, BitOrAssign, Range, Sub};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use rubbl_core::{ctry, notify::NotificationBackend, rn_severe, Array, Complex, Error, Result};
+use std::{
+    self,
+    collections::HashMap,
+    default::Default,
+    fmt::{Debug, Display},
+    fs::File,
+    hash::Hash,
+    marker::PhantomData,
+    mem,
+    ops::{AddAssign, BitOrAssign, Range, Sub},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 // Quick .npy file parsing, stealing work from the `npy` crate version 0.3.2.
 
@@ -148,17 +149,17 @@ mod mini_npy_parser {
             }
         }
 
-        let mut arr = unsafe { Array::uninitialized(D::from_shape_slice(&shape)?) };
+        let mut arr = Array::uninit(D::from_shape_slice(&shape)?);
 
         // Note: we "should" probably use a BufReader here, but the
         // performance of this bit is totally insignificant in the grand
         // scheme of things.
 
         for item in arr.iter_mut() {
-            *item = stream.read_f64::<LittleEndian>()?;
+            *item = std::mem::MaybeUninit::new(stream.read_f64::<LittleEndian>()?);
         }
 
-        Ok(arr)
+        Ok(unsafe { arr.assume_init() })
     }
 
     named!(
@@ -489,6 +490,8 @@ mod spw_table {
         NumChan(NUM_CHAN, SumScalarColumn, i32),
         RefFrequency(REF_FREQUENCY, UseFirstColumn, f64),
         Resolution(RESOLUTION, ConcatVectorColumn, f64),
+        SdmWindowFunction(SDM_WINDOW_FUNCTION, MustMatchColumn, String),
+        SdmNumBin(SDM_NUM_BIN, MustMatchColumn, i32),
         TotalBandwidth(TOTAL_BANDWIDTH, SumScalarColumn, f64)
     }
 
