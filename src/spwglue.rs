@@ -490,6 +490,8 @@ mod spw_table {
         NumChan(NUM_CHAN, SumScalarColumn, i32),
         RefFrequency(REF_FREQUENCY, UseFirstColumn, f64),
         Resolution(RESOLUTION, ConcatVectorColumn, f64),
+        SdmWindowFunction(SDM_WINDOW_FUNCTION, MustMatchColumn, String),
+        SdmNumBin(SDM_NUM_BIN, MustMatchColumn, i32),
         TotalBandwidth(TOTAL_BANDWIDTH, SumScalarColumn, f64)
     }
 
