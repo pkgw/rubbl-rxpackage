@@ -2,6 +2,7 @@
 
 steps:
 - bash: |
+    set -xeuo pipefail
     cranko github install-credential-helper
     cranko release-workflow tag
     git push --tags origin release:release
@@ -16,8 +17,23 @@ steps:
 #     CARGO_REGISTRY_TOKEN: $(CARGO_REGISTRY_TOKEN)
 
 - bash: |
+    set -xeuo pipefail
     cranko github create-releases
     cranko github upload-artifacts rubbl-rxpackage $(Build.ArtifactStagingDirectory)/binaries/*
   displayName: Create GitHub releases
   env:
     GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+- bash: |
+    set -xeuo pipefail
+    vname="rubbl-rxpackage-$(cranko show version rubbl-rxpackage)"
+    git archive --prefix="$vname/" -o "$vname.tar.gz" HEAD
+    cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 "$vname.tar.gz"
+  displayName: Upload source tarball to Zenodo
+  env:
+    ZENODO_TOKEN: $(ZENODO_TOKEN)
+
+- bash: cranko zenodo publish --metadata=ci/zenodo.json5
+  displayName: Publish to Zenodo
+  env:
+    ZENODO_TOKEN: $(ZENODO_TOKEN)
