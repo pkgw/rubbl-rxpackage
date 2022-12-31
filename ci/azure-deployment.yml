@@ -33,6 +33,11 @@ steps:
   env:
     ZENODO_TOKEN: $(ZENODO_TOKEN)
 
+- bash: cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 $(Build.ArtifactStagingDirectory)/binaries/*
+  displayName: Upload binaries to Zenodo
+  env:
+    ZENODO_TOKEN: $(ZENODO_TOKEN)
+
 - bash: cranko zenodo publish --metadata=ci/zenodo.json5
   displayName: Publish to Zenodo
   env:
