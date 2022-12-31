@@ -1,5 +1,15 @@
 # rc: micro bump
 
+- spwglue: recognize SDM_CORR_BIT column in SPECTRAL_WINDOW
+- Add automated DOI registration upon release with Cranko
+
+The DOI of this release is [xx.xxxx/dev-build.rubbl-rxpackage.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.rubbl-rxpackage.version
+
+
+# rubbl-rxpackage 0.1.3 (2021-04-06)
+
 - spwglue: recognize SDM_WINDOW_FUNCTION and SDM_NUM_BIN columns in some SPECTRAL_WINDOW tables
 - Update the build to the Rust 2018 edition
 - Update and streamline dependencies

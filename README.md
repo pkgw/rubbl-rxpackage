@@ -25,6 +25,14 @@ The name `rxpackage` is my shorthand for “[data] reduction package”.
 [Williams et al., 2019 RNAAS 3 110]: https://doi.org/10.3847/2515-5172/ab35d5
 [10.3847/2515-5172/ab35d5]: https://doi.org/10.3847/2515-5172/ab35d5
 
+There are also:
+
+- `rubbl rxpackage show version-doi` — show the DOI of the current version of
+  the software package; you can use this for citing rubbl-rxpackage
+- `rubbl rxpackage show concept-doi` — show the "concept DOI" of
+  rubbl-rxpackage; this is included for completeness but is probably not what
+  you want. If in doubt, use the `version-doi` command.
+
 
 ## Installation
 
@@ -58,37 +66,19 @@ history][gh-releases] for release history and changelogs.
 If you use this software in academic work, you must cite it appropriately in
 your research outputs.
 
-The file [CITATION.cff](./CITATION.cff) in this repository aims to provide
-machine-actionable citation information in the [Citation File Format]. The
-short story is that *you should reference two things*: the entity that is the
-specific version of the software you used, *and* the publication that
-describes that software. Both of these things have DOIs, but they are
-different things with different DOIs.
+To do so, you should reference *two* things: the entity that is the specific
+version of the software you used, *and* the publication that describes that
+software. Both of these things have DOIs, but they are different things with
+different DOIs.
 
 In particular:
 
-- The best citation for *the software itself* is to refer to release archives
-  that are stored on [Zenodo]. The pseudo-DOI [10.5281/zenodo.3403263] should
-  not be used itself, but will resolve to the latest available version of the
-  software, which is hopefully what you used. At the moment, you must then
-  construct a BibTeX entry; here is one for version 0.1.0:
-  ```
-  @misc{rubbl_rxpackage_0.1.0, % NOTE: different versions will have different data!
-    doi = {10.5281/zenodo.3403264},
-    url = {https://doi.org/10.5281/zenodo.3403264},
-    version = {v0.1.0},
-    year = 2019,
-    month = {sep},
-    publisher = {Zenodo},
-    author = {Williams, P. K. G.},
-    title = {rubbl-rxpackage}
-  }
-  ```
-  Note that the BibTeX for different releases will have different information,
-  and that the optimal BibTeX entry will be different depending on your BibTeX
-  style file; see the “References Section” section of [this AstroBetter post]
-  for more information.
-- You should also cite the publication about the software,
+- To cite *the software itself*, obtain the DOI of the release that you're
+  running by executing the command `rubbl rxpackage show version-doi`. To create
+  a BibTeX entry corresponding to that release, point your browser to
+  `https://doi.org/{the-version-doi}`, which should take you to the [Zenodo]
+  landing page for the release. Then find and follow the “BibTeX export” link.
+- You should also cite the publication describing the software,
   [Williams et al., 2019 RNAAS 3 110], which has DOI
   [10.3847/2515-5172/ab35d5]. Here is a BibTeX entry for this publication:
   ```
@@ -120,10 +110,8 @@ In particular:
   \citep{rubbl_rxpackage_0.1.0}.
   ```
 
-[Citation File Format]: https://citation-file-format.github.io/
 [Zenodo]: https://zenodo.org/
-[10.5281/zenodo.3403263]: https://doi.org/10.5281/zenodo.3403263
-[this AstroBetter post]: https://www.astrobetter.com/blog/2019/07/01/citing-astronomy-software-inline-text-examples/
+
 
 ## Legalities
 

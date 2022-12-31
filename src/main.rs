@@ -1,4 +1,4 @@
-// Copyright 2017-2021 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2022 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 //! The "rubbl rxpackage" command
@@ -6,9 +6,12 @@
 //! This provides swiss-army-knife access to various tasks that my reduction
 //! scripts need that are implemented in the Rubbl framework.
 
-use clap::{crate_version, App, AppSettings};
+use clap::{crate_version, App, AppSettings, ArgMatches, SubCommand};
 use failure::Fail;
-use rubbl_core::{notify::ClapNotificationArgsExt, Result};
+use rubbl_core::{
+    notify::{ClapNotificationArgsExt, NotificationBackend},
+    rn_warning, Result,
+};
 use std::process;
 
 // Define this before the submodules are parsed.
@@ -35,6 +38,7 @@ fn main() {
             match matches.subcommand() {
                 ("flagts", Some(m)) => flagts::do_cli(m, nbe),
                 ("peel", Some(m)) => peel::do_cli(m, nbe),
+                ("show", Some(m)) => do_show_cli(m, nbe),
                 ("spwglue", Some(m)) => spwglue::do_cli(m, nbe),
                 (unknown, Some(_)) => {
                     return err_msg!("unrecognized sub-command \"{}\"", unknown);
@@ -61,4 +65,66 @@ fn make_app<'a, 'b>() -> App<'a, 'b> {
         .subcommand(flagts::make_app())
         .subcommand(peel::make_app())
         .subcommand(spwglue::make_app())
+        .subcommand(make_show_app())
+}
+
+pub fn make_show_app<'a, 'b>() -> App<'a, 'b> {
+    SubCommand::with_name("show")
+        .bin_name("rubbl rxpackage show")
+        .about("Show various pieces of ancillary information")
+        .subcommand(
+            SubCommand::with_name("concept-doi")
+                .bin_name("rubbl rxpackage show concept-doi")
+                .about("Show the concept DOI of rubbl-rxpackage"),
+        )
+        .subcommand(
+            SubCommand::with_name("version-doi")
+                .bin_name("rubbl rxpackage show version-doi")
+                .about("Show the version DOI of rubbl-rxpackage"),
+        )
+}
+
+pub fn do_show_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
+    match matches.subcommand() {
+        ("concept-doi", Some(_)) => {
+            // For releases, this will be rewritten to the real concept DOI:
+            let doi = "xx.xxxx/dev-build.rubbl-rxpackage.concept";
+
+            if doi.starts_with("xx.") {
+                rn_warning!(
+                    nbe,
+                    "you are running a development build; the printed value is not a real DOI"
+                );
+            }
+
+            println!("{}", doi);
+            Ok(0)
+        }
+
+        ("version-doi", Some(_)) => {
+            // For releases, this will be rewritten to the real version DOI:
+            let doi = "xx.xxxx/dev-build.rubbl-rxpackage.version";
+
+            if doi.starts_with("xx.") {
+                rn_warning!(
+                    nbe,
+                    "you are running a development build; the printed value is not a real DOI"
+                );
+            }
+
+            println!("{}", doi);
+            Ok(0)
+        }
+
+        (unknown, Some(_)) => {
+            return err_msg!("unrecognized sub-command \"{}\"", unknown);
+        }
+
+        (_, None) => {
+            // No sub-command provided.
+            make_show_app().print_long_help()?;
+            println!(); // print_long_help seems to not add a final newline?
+            Ok(0)
+        }
+    }
 }
