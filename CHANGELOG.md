@@ -1,11 +1,23 @@
 # rc: micro bump
 
-- spwglue: recognize SDM_CORR_BIT column in SPECTRAL_WINDOW
-- Add automated DOI registration upon release with Cranko
+- No code changes from previous release; testing the Zenodo release
+  automation. I think that in 0.1.4, there was a conflict with
+  GitHub's built-in Zenodo integration, which I hope that I have
+  now solved.
 
 The DOI of this release is [xx.xxxx/dev-build.rubbl-rxpackage.version][vdoi].
 
 [vdoi]: https://doi.org/xx.xxxx/dev-build.rubbl-rxpackage.version
+
+
+# rubbl-rxpackage 0.1.4 (2022-12-31)
+
+- spwglue: recognize SDM_CORR_BIT column in SPECTRAL_WINDOW
+- Add automated DOI registration upon release with Cranko
+
+The DOI of this release is [10.5281/zenodo.7497292][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.7497292
 
 
 # rubbl-rxpackage 0.1.3 (2021-04-06)
