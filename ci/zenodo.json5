@@ -1,0 +1,27 @@
+{
+  "conceptrecid": "3403263",
+  "metadata": {
+    "access_right": "open",
+    "creators": [
+      {
+        "affiliation": "Center for Astrophysics | Harvard & Smithsonian",
+        "name": "Williams, Peter K. G.",
+        "orcid": "0000-0003-3734-3587"
+      }
+    ],
+    "description": "rubbl-rxpackage provides some miscellaneous astronomical data reduction utilities.",
+    "keywords": [
+      "Astronomy"
+    ],
+    "language": "eng",
+    "license": "MIT",
+    "publication_date": "2022-12-31",
+    "title": "rubbl-rxpackage 0.1.4",
+    "upload_type": "software",
+    "version": "0.1.4"
+  },
+  "conceptdoi": "10.5281/zenodo.3403263",
+  "record_id": "7497292",
+  "doi": "10.5281/zenodo.7497292",
+  "bucket_link": "https://zenodo.org/api/files/f7b339c4-0602-41ea-83d9-242a99a76982"
+}

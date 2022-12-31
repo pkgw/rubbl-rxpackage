@@ -45,6 +45,13 @@ jobs:
     displayName: Apply versions
 
   - bash: |
+      cranko zenodo preregister --metadata=ci/zenodo.json5 rubbl-rxpackage src/main.rs CHANGELOG.md
+    displayName: "Preregister Zenodo DOI"
+    ${{ if and(eq(variables['Build.SourceBranchName'], 'rc'), ne(variables['build.reason'], 'PullRequest')) }}:
+      env:
+          ZENODO_TOKEN: $(ZENODO_TOKEN)
+
+  - bash: |
       cargo build --all --release
       cargo test --all --release
     displayName: Build and test
