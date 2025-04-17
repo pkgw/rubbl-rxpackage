@@ -3,7 +3,7 @@
 
 //! Generate a time series of flagging percentages for a data set.
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{value_parser, Arg, ArgMatches, Command};
 use itertools::Itertools;
 use ndarray::Ix2;
 use pbr;
@@ -21,13 +21,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn make_app<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("flagts")
+pub fn make_command() -> Command {
+    Command::new("flagts")
         .bin_name("rubbl rxpackage flagts")
         .about("Print a time series of flagging fractions")
         .arg(
-            Arg::with_name("IN-TABLE")
+            Arg::new("IN-TABLE")
                 .help("The path of the input data set")
+                .value_parser(value_parser!(PathBuf))
                 .required(true)
                 .index(1),
         )
@@ -36,8 +37,7 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
 pub fn do_cli(matches: &ArgMatches, _nbe: &mut dyn NotificationBackend) -> Result<i32> {
     // Deal with args.
 
-    let inpath_os = matches.value_of_os("IN-TABLE").unwrap();
-    let inpath = Path::new(inpath_os).to_owned();
+    let inpath = matches.get_one::<PathBuf>("IN-TABLE").unwrap();
 
     // Open up the input table and do some prep work. We do this up here
     // so that we can validate some of the program configuration before

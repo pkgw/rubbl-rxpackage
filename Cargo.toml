@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 byteorder = "^1.1"
-clap = { version = "^4", features = ["derive"] }
+clap = { version = "^4", features = ["cargo"] }
 itertools = "^0.14"
 ndarray = "^0.16"
 nom = "^5"

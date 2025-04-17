@@ -1,7 +1,7 @@
 // Copyright 2017-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use ndarray::{s, Ix1, Ix2};
 use num_traits::{Float, One, Signed, Zero};
 use pbr;
@@ -1397,13 +1397,13 @@ impl FromStr for DataMappingKind {
 
 // Let's get this show on the road.
 
-pub fn make_app<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("spwglue")
+pub fn make_command() -> Command {
+    Command::new("spwglue")
         .bin_name("rubbl rxpackage spwglue")
         .about("Glue together adjacent spectral windows in a CASA data set")
         .arg(
-            Arg::with_name("window")
-                .short("w")
+            Arg::new("window")
+                .short('w')
                 .long("window")
                 .long_help(
                     "Define a glued spectral window that concatenates \
@@ -1411,49 +1411,48 @@ pub fn make_app<'a, 'b>() -> App<'a, 'b> {
                      numbers are zero-based.",
                 )
                 .value_name("N-M")
-                .takes_value(true)
                 .number_of_values(1)
                 .required(true)
-                .multiple(true),
+                .action(ArgAction::Append),
         )
         .arg(
-            Arg::with_name("meanbp")
+            Arg::new("meanbp")
                 .long("meanbp")
                 .help("Path a .npy save file with mean bandpass")
                 .value_name("PATH")
-                .takes_value(true)
+                .value_parser(value_parser!(PathBuf))
                 .number_of_values(1),
         )
         .arg(
-            Arg::with_name("data_mapping")
+            Arg::new("data_mapping")
                 .long("mapping")
                 .help("How to map the DATA/MODEL_DATA/CORRECTED_DATA columns in the output.")
                 .value_name("MAPPING")
-                .possible_values(&["passthrough", "correct"])
+                .value_parser(["passthrough", "correct"])
                 .default_value("passthrough"),
         )
         .arg(
-            Arg::with_name("out_field")
-                .short("f")
+            Arg::new("out_field")
+                .short('f')
                 .long("field")
                 .long_help("Output data from field FIELDNUM into file OUTPATH")
-                .value_name("FIELDNUM OUTPATH")
-                .takes_value(true)
+                .value_names(["FIELDNUM", "OUTPATH"])
                 .number_of_values(2)
-                .multiple(true),
+                .action(ArgAction::Append),
         )
         .arg(
-            Arg::with_name("out_default")
-                .short("D")
+            Arg::new("out_default")
+                .short('D')
                 .long("default")
                 .long_help("Output any data not associated with a `-f` argument into file OUTPATH")
                 .value_name("OUTPATH")
-                .takes_value(true)
+                .value_parser(value_parser!(PathBuf))
                 .number_of_values(1),
         )
         .arg(
-            Arg::with_name("IN-TABLE")
+            Arg::new("IN-TABLE")
                 .help("The path of the input data set")
+                .value_parser(value_parser!(PathBuf))
                 .required(true)
                 .index(1),
         )
@@ -1468,54 +1467,50 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
     // some Iterator interface to bunch the items into groups of two but I
     // can't find it right now.
 
-    let inpath_os = matches.value_of_os("IN-TABLE").unwrap();
-    let inpath_str = inpath_os.to_string_lossy();
-    let inpath = Path::new(inpath_os).to_owned();
+    let inpath = matches.get_one::<PathBuf>("IN-TABLE").unwrap();
+    let inpath_str = inpath.to_string_lossy();
 
     let mut destinations = Vec::new();
     let mut field_id_to_dest_index = HashMap::new();
     let mut dest_path_to_dest_index = HashMap::new();
 
-    if let Some(out_field_items) = matches.values_of("out_field") {
-        let mut field_item_is_id = true;
-        let mut last_field_id = 0i32;
+    if let Some(out_field_occurrences) = matches.get_occurrences::<String>("out_field") {
+        for mut out_field_items in out_field_occurrences {
+            let item = out_field_items.next().unwrap();
 
-        for info in out_field_items {
-            if field_item_is_id {
-                last_field_id = ctry!(info.parse::<i32>();
-                                      "bad field ID \"{}\" in field output arguments", info);
+            let last_field_id = ctry!(
+                item.parse::<i32>();
+                "bad field ID \"{}\" in field output arguments", item
+            );
+
+            let item = out_field_items.next().unwrap();
+            let dest = Path::new(item).to_owned();
+            let mut idx = destinations.len();
+
+            if let Some(prev_idx) = dest_path_to_dest_index.insert(dest.clone(), idx) {
+                // This dest path already appeared; re-use its entry. This lets us
+                // write multiple fields to the same output file.
+                idx = prev_idx;
             } else {
-                let dest = Path::new(info).to_owned();
-                let mut idx = destinations.len();
-
-                if let Some(prev_idx) = dest_path_to_dest_index.insert(dest.clone(), idx) {
-                    // This dest path already appeared; re-use its entry. This lets us
-                    // write multiple fields to the same output file.
-                    idx = prev_idx;
-                } else {
-                    destinations.push(dest);
-                }
-
-                if field_id_to_dest_index.insert(last_field_id, idx).is_some() {
-                    return err_msg!(
-                        "field ID {} appears multiple times in field output arguments",
-                        last_field_id
-                    );
-                }
+                destinations.push(dest);
             }
 
-            field_item_is_id = !field_item_is_id;
+            if field_id_to_dest_index.insert(last_field_id, idx).is_some() {
+                return err_msg!(
+                    "field ID {} appears multiple times in field output arguments",
+                    last_field_id
+                );
+            }
         }
     }
 
-    let default_dest_index = matches.value_of_os("out_default").map(|info| {
-        let dest = Path::new(info).to_owned();
+    let default_dest_index = matches.get_one::<PathBuf>("out_default").map(|dest| {
         let mut idx = destinations.len();
 
         if let Some(prev_idx) = dest_path_to_dest_index.insert(dest.clone(), idx) {
             idx = prev_idx;
         } else {
-            destinations.push(dest);
+            destinations.push(dest.clone());
         }
 
         idx
@@ -1527,14 +1522,15 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
 
     let mut out_spws = Vec::new();
 
-    for descr in matches.values_of("window").unwrap() {
+    for mut descr_occurrences in matches.get_occurrences::<String>("window").unwrap() {
+        let descr = descr_occurrences.next().unwrap();
         let m = ctry!(descr.parse::<OutputSpwInfo>();
                       "bad window specification; they should have the form \"M-N\" where M \
                        and N are numbers, but I got \"{}\"", descr);
         out_spws.push(m);
     }
 
-    let inv_sq_mean_bp = match matches.value_of_os("meanbp") {
+    let inv_sq_mean_bp = match matches.get_one::<PathBuf>("meanbp") {
         None => None,
         Some(meanbp_path) => {
             let mut meanbp = ctry!(File::open(&meanbp_path);
@@ -1557,7 +1553,8 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
         }
     };
 
-    let data_mapping: DataMappingKind = matches.value_of("data_mapping").unwrap().parse()?;
+    let data_mapping: DataMappingKind =
+        matches.get_one::<String>("data_mapping").unwrap().parse()?;
 
     // Open up the input table and do some prep work. We do this up here
     // so that we can validate some of the program configuration before
@@ -1888,7 +1885,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
 
         // First destination ...
 
-        let (out_feed_path, mut out_feed_table) = open_table(&destinations[0], "FEED", false)?;
+        let (_, mut out_feed_table) = open_table(&destinations[0], "FEED", false)?;
         let mut out_row = out_feed_table.get_row_writer()?;
         let mut n_rows_written = 0;
 
@@ -1928,7 +1925,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
 
         // First destination ...
 
-        let (out_cd_path, mut out_cd_table) = open_table(&destinations[0], "CALDEVICE", false)?;
+        let (_, mut out_cd_table) = open_table(&destinations[0], "CALDEVICE", false)?;
         let mut out_row = out_cd_table.get_row_writer()?;
         let mut n_rows_written = 0;
 

@@ -46,7 +46,7 @@
 //!     Or we can add to main.ms:MODEL to allow incremental change. This tool
 //!     iterates over the two datasets and performs this operation.
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use ndarray::{Ix2, Zip};
 use pbr;
 use rubbl_casatables::{CasaDataType, Table, TableOpenMode, TableRow};
@@ -63,37 +63,36 @@ use std::{
 
 // Let's get this show on the road.
 
-pub fn make_app<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("peel")
+pub fn make_command() -> Command {
+    Command::new("peel")
         .bin_name("rubbl rxpackage peel")
         .about("Model a source with source-specific calibration gain solutions")
         .arg(
-            Arg::with_name("incremental")
+            Arg::new("incremental")
                 .long("incremental")
+                .action(ArgAction::SetTrue)
                 .help("If specified, add the model to main:MODEL_DATA, rather than overwriting"),
         )
         .arg(
-            Arg::with_name("MAIN-TABLE")
+            Arg::new("MAIN-TABLE")
                 .help("The path of the data set into which to insert the source model")
+                .value_parser(value_parser!(PathBuf))
                 .required(true)
                 .index(1),
         )
         .arg(
-            Arg::with_name("WORK-TABLE")
+            Arg::new("WORK-TABLE")
                 .help("The path of the data set containing the source model and calibration gains")
+                .value_parser(value_parser!(PathBuf))
                 .required(true)
                 .index(2),
         )
 }
 
 pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
-    let mainpath_os = matches.value_of_os("MAIN-TABLE").unwrap();
-    let mainpath = Path::new(mainpath_os).to_owned();
-
-    let workpath_os = matches.value_of_os("WORK-TABLE").unwrap();
-    let workpath = Path::new(workpath_os).to_owned();
-
-    let incremental = matches.is_present("incremental");
+    let mainpath = matches.get_one::<PathBuf>("MAIN-TABLE").unwrap();
+    let workpath = matches.get_one::<PathBuf>("WORK-TABLE").unwrap();
+    let incremental = matches.contains_id("incremental");
 
     // Open up tables and do some checking.
 
