@@ -5,8 +5,13 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use ndarray::{s, Ix1, Ix2};
 use num_traits::{Float, One, Signed, Zero};
 use pbr;
-use rubbl_casatables::{CasaDataType, CasaScalarData, Table, TableOpenMode, TableRow};
-use rubbl_core::{ctry, notify::NotificationBackend, rn_severe, Array, Complex, Error, Result};
+use rubbl_casatables::{CasaDataType, CasaScalarData, Table, TableError, TableOpenMode, TableRow};
+use rubbl_core::{
+    anyhow::{self, Error, Result},
+    ctry,
+    notify::NotificationBackend,
+    rn_severe, Array, Complex,
+};
 use std::{
     self,
     collections::HashMap,
@@ -274,7 +279,7 @@ mod spw_table {
             _col_name: &str,
             _mappings: &[OutputSpwInfo],
             _dest_table: &mut Table,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             Ok(())
         }
     }
@@ -295,7 +300,7 @@ mod spw_table {
             col_name: &str,
             mappings: &[OutputSpwInfo],
             dest_table: &mut Table,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let data = src_table.get_col_as_vec::<T>(col_name)?;
 
             for (i, mapping) in mappings.iter().enumerate() {
@@ -324,7 +329,7 @@ mod spw_table {
             col_name: &str,
             mappings: &[OutputSpwInfo],
             dest_table: &mut Table,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let data = src_table.get_col_as_vec::<T>(col_name)?;
 
             for (i, mapping) in mappings.iter().enumerate() {
@@ -362,7 +367,7 @@ mod spw_table {
             col_name: &str,
             mappings: &[OutputSpwInfo],
             dest_table: &mut Table,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let data = src_table.get_col_as_vec::<T>(col_name)?;
 
             for (i, mapping) in mappings.iter().enumerate() {
@@ -399,7 +404,7 @@ mod spw_table {
             col_name: &str,
             mappings: &[OutputSpwInfo],
             dest_table: &mut Table,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             for (i, mapping) in mappings.iter().enumerate() {
                 let mut vec = Vec::<T>::new();
 
@@ -422,7 +427,7 @@ mod spw_table {
     /// allows us to leverage Rust's type system nicely.
     ///
     /// Because macros work on an AST level, we can't capture the "state type"
-    /// of each column as a genuine type (e.g. UseFirstColumn<i32>) because we
+    /// of each column as a genuine type (e.g. `UseFirstColumn<i32>`) because we
     /// are then unable to refer to that type in expression contexts.
     /// Therefore we have to put that piece of info in terms of an "ident"
     /// typed capture.
@@ -447,7 +452,7 @@ mod spw_table {
                     }
                 }
 
-                pub fn process(&self, src_table: &mut Table, mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<()> {
+                pub fn process(&self, src_table: &mut Table, mappings: &[OutputSpwInfo], dest_table: &mut Table) -> Result<(), TableError> {
                     match self {
                         $(
                             &SpectralWindowColumn::$variant_name(ref h) =>
@@ -514,7 +519,7 @@ mod spw_table {
             src_table: &mut Table,
             mappings: &[OutputSpwInfo],
             dest_table: &mut Table,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             self.0.process(src_table, mappings, dest_table)
         }
     }
@@ -547,7 +552,7 @@ mod main_table {
             _in_spw: &InputSpwInfo,
             _out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             // Since this column helps define the record's identity, subsequent rows match the
             // first row by definition.
             if self.value.is_none() {
@@ -564,7 +569,7 @@ mod main_table {
             _vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             if let Some(ref v) = self.value {
                 table.put_cell(col_name, row, v)?;
             }
@@ -592,7 +597,7 @@ mod main_table {
 
     /// Without the following, the typechecker considers our impls to not be
     /// mutually exclusive because num_traits could in principle impl Float, etc,
-    /// for Vec<T>.
+    /// for `Vec<T>`.
     trait NeverImpledForVec {}
     impl NeverImpledForVec for f32 {}
     impl NeverImpledForVec for f64 {}
@@ -666,7 +671,7 @@ mod main_table {
             _in_spw: &InputSpwInfo,
             _out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let cur = row.get_cell(col_name)?;
 
             if let Some(ref prev) = self.value {
@@ -689,7 +694,7 @@ mod main_table {
             _vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             if let Some(ref v) = self.value {
                 table.put_cell(col_name, row, v)?;
             }
@@ -723,7 +728,7 @@ mod main_table {
             _in_spw: &InputSpwInfo,
             _out_spw: &OutputSpwInfo,
             _row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             Ok(())
         }
 
@@ -734,7 +739,7 @@ mod main_table {
             _vis_factor: &MaybeVisFactor,
             _table: &mut Table,
             _row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             Ok(())
         }
 
@@ -761,7 +766,7 @@ mod main_table {
             _in_spw: &InputSpwInfo,
             _out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let cur = row.get_cell(col_name)?;
             self.value |= cur;
             Ok(())
@@ -774,7 +779,7 @@ mod main_table {
             _vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             Ok(table.put_cell(col_name, row, &self.value)?)
         }
 
@@ -797,7 +802,7 @@ mod main_table {
         out_spw: &OutputSpwInfo,
         row: &mut TableRow,
         buf: &mut Array<T, Ix2>,
-    ) -> Result<()>
+    ) -> Result<(), TableError>
     where
         T: CasaScalarData + Copy + Default + Debug,
     {
@@ -836,7 +841,7 @@ mod main_table {
             in_spw: &InputSpwInfo,
             out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             process_pol_concat_record(col_name, in_spw, out_spw, row, &mut self.buf)
         }
 
@@ -847,7 +852,7 @@ mod main_table {
             _vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             Ok(table.put_cell(col_name, row, &self.buf)?)
         }
 
@@ -884,7 +889,7 @@ mod main_table {
             in_spw: &InputSpwInfo,
             out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             if let DataMappingKind::Correct = data_mapping {
                 return Ok(());
             }
@@ -899,7 +904,7 @@ mod main_table {
             vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             if let DataMappingKind::Correct = data_mapping {
                 return Ok(());
             }
@@ -942,7 +947,7 @@ mod main_table {
             in_spw: &InputSpwInfo,
             out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             process_pol_concat_record(col_name, in_spw, out_spw, row, &mut self.buf)
         }
 
@@ -953,7 +958,7 @@ mod main_table {
             vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let final_col_name = match data_mapping {
                 DataMappingKind::Correct => "DATA",
                 _ => col_name,
@@ -991,7 +996,7 @@ mod main_table {
             _in_spw: &InputSpwInfo,
             _out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             let chunk: Array<f32, Ix1> = row.get_cell(col_name)?;
 
             let n_chunk_pol = chunk.len();
@@ -1013,7 +1018,7 @@ mod main_table {
             _vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             self.buf /= self.n_contrib as f32;
             Ok(table.put_cell(col_name, row, &self.buf)?)
         }
@@ -1049,29 +1054,29 @@ mod main_table {
                 }
 
                 fn process(&mut self, data_mapping: DataMappingKind, in_spw: &InputSpwInfo,
-                           out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<()>
+                           out_spw: &OutputSpwInfo, row: &mut TableRow) -> Result<(), TableError>
                 {
                     let col_name = self.col_name();
 
-                    Ok(ctry!(match self {
+                    Ok(match self {
                         $(
                             &mut VisDataColumn::$variant_name(ref mut s) =>
                                 s.process(col_name, data_mapping, in_spw, out_spw, row),
                         )+
-                    }; "problem processing column {}", col_name))
+                    }?)
                 }
 
                 fn emit(&mut self, data_mapping: DataMappingKind, vis_factor: &MaybeVisFactor,
-                        table: &mut Table, row: u64) -> Result<()>
+                        table: &mut Table, row: u64) -> Result<(), TableError>
                 {
                     let col_name = self.col_name();
 
-                    Ok(ctry!(match self {
+                    Ok(match self {
                         $(
                             &mut VisDataColumn::$variant_name(ref mut s) =>
                                 s.emit(col_name, data_mapping, vis_factor, table, row),
                         )+
-                    }; "problem emitting column {}", col_name))
+                    }?)
                 }
 
                 fn reset(&mut self) {
@@ -1148,7 +1153,7 @@ mod main_table {
             in_spw: &InputSpwInfo,
             out_spw: &OutputSpwInfo,
             row: &mut TableRow,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             self.0.process(data_mapping, in_spw, out_spw, row)
         }
 
@@ -1159,7 +1164,7 @@ mod main_table {
             vis_factor: &MaybeVisFactor,
             table: &mut Table,
             row: u64,
-        ) -> Result<()> {
+        ) -> Result<(), TableError> {
             self.0.emit(data_mapping, vis_factor, table, row)
         }
 
@@ -1197,7 +1202,7 @@ struct VisRecordIdentity<T: Clone + Debug + Eq + Hash> {
 }
 
 impl<T: Clone + Debug + Eq + Hash> VisRecordIdentity<T> {
-    pub fn create(discriminant: T, row: &mut TableRow, last_time: f64) -> Result<Self> {
+    pub fn create(discriminant: T, row: &mut TableRow, last_time: f64) -> Result<Self, TableError> {
         let mut time: f64 = row.get_cell("TIME")?;
 
         // Times are seconds since MJD=0, so they have magnitudes of about
@@ -1332,7 +1337,7 @@ impl<'a> OutputRecordState<'a> {
         data_mapping: DataMappingKind,
         in_spw: &InputSpwInfo,
         row: &mut TableRow,
-    ) -> Result<bool> {
+    ) -> Result<bool, TableError> {
         for col in &mut self.columns {
             col.process(data_mapping, in_spw, self.spw_info, row)?;
         }
@@ -1347,7 +1352,7 @@ impl<'a> OutputRecordState<'a> {
         vis_factor: &MaybeVisFactor,
         table: &mut Table,
         row: u64,
-    ) -> Result<()> {
+    ) -> Result<(), TableError> {
         for col in &mut self.columns {
             col.emit(data_mapping, vis_factor, table, row)?;
         }
@@ -1895,8 +1900,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
                 let first_idx = idx_iter.next().unwrap();
 
                 if spwid as usize == first_idx {
-                    ctry!(out_feed_table.add_rows(1);
-                          "failed to add row to \"{}\"", out_feed_path.display());
+                    out_feed_table.add_rows(1)?;
                     in_row.copy_and_put(&mut out_row, n_rows_written)?;
                     out_feed_table.put_cell("SPECTRAL_WINDOW_ID", n_rows_written, &(i as i32))?;
                     n_rows_written += 1;
@@ -1936,8 +1940,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
                 let first_idx = idx_iter.next().unwrap();
 
                 if spwid as usize == first_idx {
-                    ctry!(out_cd_table.add_rows(1);
-                          "failed to add row to \"{}\"", out_cd_path.display());
+                    out_cd_table.add_rows(1)?;
                     in_row.copy_and_put(&mut out_row, n_rows_written)?;
                     out_cd_table.put_cell("SPECTRAL_WINDOW_ID", n_rows_written, &(i as i32))?;
                     n_rows_written += 1;
@@ -2023,7 +2026,9 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
         let ddid = in_row.get_cell::<i32>("DATA_DESC_ID")?;
         let in_spw_id = match ddid_to_in_spw_id.get(&(ddid as usize)) {
             Some(i) => i,
-            None => { return Ok(()); } // this DDID is being dropped
+            None => {
+                return Ok(());
+            } // this DDID is being dropped
         };
 
         let fieldid = in_row.get_cell::<i32>("FIELD_ID")?;
@@ -2032,9 +2037,9 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
         let row_ident = VisRecordIdentity::create(out_spw_id, &mut in_row, last_time)?;
 
         if !records_in_progress.contains_key(&row_ident) {
-            let state = match state_pool.pop(){
+            let state = match state_pool.pop() {
                 Some(s) => s.reset(&out_spws[out_spw_id]),
-                None => OutputRecordState::new(&out_spws[out_spw_id], col_state_template.clone())
+                None => OutputRecordState::new(&out_spws[out_spw_id], col_state_template.clone()),
             };
 
             records_in_progress.insert(row_ident.clone(), state);
@@ -2042,8 +2047,7 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
 
         let record_complete = {
             let state = records_in_progress.get_mut(&row_ident).unwrap();
-            ctry!(state.process(data_mapping, in_spw_info, &mut in_row);
-                  "problem processing input row #{}", in_row_num)
+            state.process(data_mapping, in_spw_info, &mut in_row)?
         };
 
         if record_complete {
@@ -2058,10 +2062,17 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
             };
 
             if let Some(out_rec) = maybe_out_rec {
-                ctry!(out_rec.table.add_rows(1); "failed to add row to \"{}\"", out_rec.path.display());
-                state.emit(data_mapping, &inv_sq_mean_bp, &mut out_rec.table, out_rec.num_rows)?;
+                out_rec.table.add_rows(1)?;
+                state.emit(
+                    data_mapping,
+                    &inv_sq_mean_bp,
+                    &mut out_rec.table,
+                    out_rec.num_rows,
+                )?;
                 // Rewriting this is kind of lame, but eh.
-                out_rec.table.put_cell("DATA_DESC_ID", out_rec.num_rows, &(out_spw_id as i32))?;
+                out_rec
+                    .table
+                    .put_cell("DATA_DESC_ID", out_rec.num_rows, &(out_spw_id as i32))?;
                 out_rec.num_rows += 1;
             }
 

@@ -21,9 +21,15 @@ macro_rules! err_msg {
     }
 }
 
-#[derive(Fail, Debug)]
-#[fail(display = "{}", _0)]
+#[derive(thiserror::Error, Debug)]
+#[error("{0}")]
 pub struct MiscellaneousError(String);
+
+impl From<MiscellaneousError> for rubbl_casatables::TableError {
+    fn from(e: MiscellaneousError) -> Self {
+        rubbl_casatables::TableError::UserMessage(e.0)
+    }
+}
 
 mod flagts;
 mod peel;

@@ -8,7 +8,12 @@ use itertools::Itertools;
 use ndarray::Ix2;
 use pbr;
 use rubbl_casatables::{Table, TableOpenMode};
-use rubbl_core::{ctry, notify::NotificationBackend, Array, Result};
+use rubbl_core::{
+    anyhow::{self, Result},
+    ctry,
+    notify::NotificationBackend,
+    Array,
+};
 use std::{
     self,
     collections::HashMap,

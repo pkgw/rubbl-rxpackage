@@ -50,8 +50,16 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use ndarray::{Ix2, Zip};
 use pbr;
 use rubbl_casatables::{CasaDataType, Table, TableOpenMode, TableRow};
-use rubbl_core::{ctry, notify::NotificationBackend, rn_fatal, Array, Complex, Result};
-use std::{self, path::Path};
+use rubbl_core::{
+    anyhow::{self, Result},
+    ctry,
+    notify::NotificationBackend,
+    rn_fatal, Array, Complex,
+};
+use std::{
+    self,
+    path::{Path, PathBuf},
+};
 
 // Let's get this show on the road.
 
