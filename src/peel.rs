@@ -46,46 +46,53 @@
 //!     Or we can add to main.ms:MODEL to allow incremental change. This tool
 //!     iterates over the two datasets and performs this operation.
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use ndarray::{Ix2, Zip};
 use pbr;
-use rubbl_casatables::{Table, TableOpenMode};
-use rubbl_core::{ctry, notify::NotificationBackend, rn_fatal, Array, Complex, Result};
-use std::{self, path::Path};
+use rubbl_casatables::{CasaDataType, Table, TableOpenMode, TableRow};
+use rubbl_core::{
+    anyhow::{self, Result},
+    ctry,
+    notify::NotificationBackend,
+    rn_fatal, Array, Complex,
+};
+use std::{
+    self,
+    path::{Path, PathBuf},
+};
 
 // Let's get this show on the road.
 
-pub fn make_app<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("peel")
+pub fn make_command() -> Command {
+    Command::new("peel")
         .bin_name("rubbl rxpackage peel")
         .about("Model a source with source-specific calibration gain solutions")
         .arg(
-            Arg::with_name("incremental")
+            Arg::new("incremental")
                 .long("incremental")
+                .action(ArgAction::SetTrue)
                 .help("If specified, add the model to main:MODEL_DATA, rather than overwriting"),
         )
         .arg(
-            Arg::with_name("MAIN-TABLE")
+            Arg::new("MAIN-TABLE")
                 .help("The path of the data set into which to insert the source model")
+                .value_parser(value_parser!(PathBuf))
                 .required(true)
                 .index(1),
         )
         .arg(
-            Arg::with_name("WORK-TABLE")
+            Arg::new("WORK-TABLE")
                 .help("The path of the data set containing the source model and calibration gains")
+                .value_parser(value_parser!(PathBuf))
                 .required(true)
                 .index(2),
         )
 }
 
 pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
-    let mainpath_os = matches.value_of_os("MAIN-TABLE").unwrap();
-    let mainpath = Path::new(mainpath_os).to_owned();
-
-    let workpath_os = matches.value_of_os("WORK-TABLE").unwrap();
-    let workpath = Path::new(workpath_os).to_owned();
-
-    let incremental = matches.is_present("incremental");
+    let mainpath = matches.get_one::<PathBuf>("MAIN-TABLE").unwrap();
+    let workpath = matches.get_one::<PathBuf>("WORK-TABLE").unwrap();
+    let incremental = matches.contains_id("incremental");
 
     // Open up tables and do some checking.
 
@@ -120,32 +127,43 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
         return Ok(1);
     }
 
-    fn check_one_col(table: &mut Table, path: &Path, colname: &str) -> Result<()> {
-        let col_names = ctry!(table.column_names();
-                              "failed to get names of columns in \"{}\"", path.display());
-        let mut seen_col = false;
+    fn check_cols(table: &mut Table, path: &Path, wanted_col_names: &[&str]) -> Result<()> {
+        let observed_col_names = ctry!(
+            table.column_names();
+            "failed to get names of columns in \"{}\"", path.display()
+        );
 
-        for n in &col_names {
-            if n == colname {
-                seen_col = true;
-                break;
+        // Not highly efficient, but N is small here ...
+
+        for wanted_col in wanted_col_names {
+            let mut seen_col = false;
+
+            for n in &observed_col_names {
+                if n == wanted_col {
+                    seen_col = true;
+                    break;
+                }
             }
-        }
 
-        if !seen_col {
-            return err_msg!(
-                "{} column in table in \"{}\" \
-                 is required but missing",
-                colname,
-                path.display()
-            );
+            if !seen_col {
+                return err_msg!(
+                    "{} column in table in \"{}\" \
+                    is required but missing",
+                    wanted_col,
+                    path.display()
+                );
+            }
         }
 
         Ok(())
     }
 
-    check_one_col(&mut main_table, &mainpath, "MODEL_DATA")?;
-    check_one_col(&mut work_table, &workpath, "CORRECTED_DATA")?;
+    check_cols(&mut main_table, &mainpath, &["FLAG", "MODEL_DATA"])?;
+    check_cols(
+        &mut work_table,
+        &workpath,
+        &["FLAG", "DATA", "MODEL_DATA", "CORRECTED_DATA"],
+    )?;
 
     // Do the operation.
 
@@ -155,15 +173,56 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
     let mut pb = pbr::ProgressBar::new(n_rows);
     pb.set_max_refresh_rate(Some(std::time::Duration::from_millis(500)));
 
-    for row in 0..n_rows {
-        main_table.read_row(&mut main_row, row)?;
-        work_table.read_row(&mut work_row, row)?;
+    /// Helper to provide error context if a `get_cell` call fails.
+    ///
+    /// This could almost work as a closure, but the type parametricity would be
+    /// a hassle.
+    #[inline(always)]
+    fn getcell_context<T: CasaDataType>(
+        row: &mut TableRow,
+        col_name: &str,
+        rownum: u64,
+        path: &Path,
+    ) -> Result<T> {
+        Ok(ctry!(
+            row.get_cell(col_name);
+            "failed to read column \"{}\" of row #{} of file \"{}\"", col_name, rownum, path.display()
+        ))
+    }
 
-        let main_flag: Array<bool, Ix2> = main_row.get_cell("FLAG")?;
-        let work_data: Array<Complex<f32>, Ix2> = work_row.get_cell("DATA")?;
-        let work_flag: Array<bool, Ix2> = work_row.get_cell("FLAG")?;
-        let work_model: Array<Complex<f32>, Ix2> = work_row.get_cell("MODEL_DATA")?;
-        let mut work_corr: Array<Complex<f32>, Ix2> = work_row.get_cell("CORRECTED_DATA")?;
+    /// Helper to provide error context if a `put_call` call fails.
+    #[inline(always)]
+    fn putcell_context<T: CasaDataType>(
+        table: &mut Table,
+        col_name: &str,
+        row: u64,
+        value: &T,
+        path: &Path,
+    ) -> Result<()> {
+        Ok(ctry!(
+            table.put_cell(col_name, row, value);
+            "failed to write column \"{}\" of row #{} of file \"{}\"", col_name, row, path.display()
+        ))
+    }
+
+    for row in 0..n_rows {
+        ctry!(
+            main_table.read_row(&mut main_row, row);
+            "failed to read row #{} from \"{}\"", row, mainpath.display()
+        );
+        ctry!(
+            work_table.read_row(&mut work_row, row);
+            "failed to read row #{} from \"{}\"", row, workpath.display()
+        );
+
+        let main_flag: Array<bool, Ix2> = getcell_context(&mut main_row, "FLAG", row, &mainpath)?;
+        let work_data: Array<Complex<f32>, Ix2> =
+            getcell_context(&mut work_row, "DATA", row, &workpath)?;
+        let work_flag: Array<bool, Ix2> = getcell_context(&mut work_row, "FLAG", row, &workpath)?;
+        let work_model: Array<Complex<f32>, Ix2> =
+            getcell_context(&mut work_row, "MODEL_DATA", row, &workpath)?;
+        let mut work_corr: Array<Complex<f32>, Ix2> =
+            getcell_context(&mut work_row, "CORRECTED_DATA", row, &workpath)?;
 
         let mut peel_flag = main_flag | work_flag;
 
@@ -195,14 +254,15 @@ pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result
                 }
             });
 
-        main_table.put_cell("FLAG", row, &peel_flag)?;
+        putcell_context(&mut main_table, "FLAG", row, &peel_flag, &mainpath)?;
 
         if incremental {
-            let main_model: Array<Complex<f32>, Ix2> = main_row.get_cell("MODEL_DATA")?;
+            let main_model: Array<Complex<f32>, Ix2> =
+                getcell_context(&mut main_row, "MODEL_DATA", row, &mainpath)?;
             peel_model += &main_model;
         }
 
-        main_table.put_cell("MODEL_DATA", row, &peel_model)?;
+        putcell_context(&mut main_table, "MODEL_DATA", row, &peel_model, &mainpath)?;
         pb.inc();
     }
 
