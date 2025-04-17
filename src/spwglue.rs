@@ -910,7 +910,7 @@ mod main_table {
             }
 
             if let &Some(ref arr) = vis_factor {
-                self.buf *= &arr.view().into_shape((arr.len(), 1)).unwrap();
+                self.buf *= &arr.view().to_shape((arr.len(), 1)).unwrap();
             }
 
             Ok(table.put_cell(col_name, row, &self.buf)?)
@@ -965,7 +965,7 @@ mod main_table {
             };
 
             if let &Some(ref arr) = vis_factor {
-                self.buf *= &arr.view().into_shape((arr.len(), 1)).unwrap();
+                self.buf *= &arr.view().to_shape((arr.len(), 1)).unwrap();
             }
 
             Ok(table.put_cell(final_col_name, row, &self.buf)?)
