@@ -1,3 +1,16 @@
+# rubbl-rxpackage 0.1.6 (2025-04-20)
+
+- Update to the latest version of Rubbl and its dependencies; this
+  involves a fair amount of internal reworking, but shuldn't affect
+  observable behavior.
+- In `peel`, try to be better about reporting errors during I/O
+  (issue reported by Jimmy Lynch).
+
+The DOI of this release is [10.5281/zenodo.15251887][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.15251887
+
+
 # rubbl-rxpackage 0.1.5 (2022-12-31)
 
 - No code changes from previous release; testing the Zenodo release

@@ -9,7 +9,7 @@ trigger:
 jobs:
 - job: Linux
   pool:
-    vmImage: ubuntu-20.04
+    vmImage: ubuntu-latest
 
   # Deployment creds included unconditionally in this simple workflow; secrets
   # will be withheld in PR builds.
