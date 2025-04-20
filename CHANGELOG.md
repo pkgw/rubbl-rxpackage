@@ -1,13 +1,26 @@
 # rc: micro bump
 
+- Update to the latest version of Rubbl and its dependencies; this
+  involves a fair amount of internal reworking, but shuldn't affect
+  observable behavior.
+- In `peel`, try to be better about reporting errors during I/O
+  (issue reported by Jimmy Lynch).
+
+The DOI of this release is [xx.xxxx/dev-build.rubbl-rxpackage.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.rubbl-rxpackage.version
+
+
+# rubbl-rxpackage 0.1.5 (2022-12-31)
+
 - No code changes from previous release; testing the Zenodo release
   automation. I think that in 0.1.4, there was a conflict with
   GitHub's built-in Zenodo integration, which I hope that I have
   now solved.
 
-The DOI of this release is [xx.xxxx/dev-build.rubbl-rxpackage.version][vdoi].
+The DOI of this release is [10.5281/zenodo.7497313][vdoi].
 
-[vdoi]: https://doi.org/xx.xxxx/dev-build.rubbl-rxpackage.version
+[vdoi]: https://doi.org/10.5281/zenodo.7497313
 
 
 # rubbl-rxpackage 0.1.4 (2022-12-31)

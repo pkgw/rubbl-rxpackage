@@ -1,18 +1,17 @@
 [package]
 name = "rubbl-rxpackage"
-version = "0.0.0-dev.0"  # managed with Cranko; see README
+version = "0.0.0-dev.0"                        # managed with Cranko; see README
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 
 [dependencies]
 byteorder = "^1.1"
-clap = "^2.26"
-failure = "^0.1"
-failure_derive = "^0.1"
-itertools = "^0.10"
-ndarray = "^0.15"
+clap = { version = "^4", features = ["cargo"] }
+itertools = "^0.14"
+ndarray = "^0.16"
 nom = "^5"
 num-traits = "^0.2"
 pbr = "^1.0"
-rubbl_casatables = "^0.3"
-rubbl_core = "^0.2"
+rubbl_casatables = "^0.9"
+rubbl_core = { version = "^0.5", features = ["anyhow", "notifications"] }
+thiserror = "2.0.12"
