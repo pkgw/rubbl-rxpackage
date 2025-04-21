@@ -1,14 +1,25 @@
 # rc: micro bump
 
+- spwglue: fix a failure due to not-quite-correct `unsafe` Rust code (#10,
+  @pkgw). Also rework the `.npy` file parser to use much more modern `nom`,
+  although this should not result in any observable behavior changes.
+
+The DOI of this release is [xx.xxxx/dev-build.rubbl-rxpackage.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.rubbl-rxpackage.version
+
+
+# rubbl-rxpackage 0.1.6 (2025-04-20)
+
 - Update to the latest version of Rubbl and its dependencies; this
   involves a fair amount of internal reworking, but shuldn't affect
   observable behavior.
 - In `peel`, try to be better about reporting errors during I/O
   (issue reported by Jimmy Lynch).
 
-The DOI of this release is [xx.xxxx/dev-build.rubbl-rxpackage.version][vdoi].
+The DOI of this release is [10.5281/zenodo.15251887][vdoi].
 
-[vdoi]: https://doi.org/xx.xxxx/dev-build.rubbl-rxpackage.version
+[vdoi]: https://doi.org/10.5281/zenodo.15251887
 
 
 # rubbl-rxpackage 0.1.5 (2022-12-31)
