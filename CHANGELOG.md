@@ -1,3 +1,14 @@
+# rubbl-rxpackage 0.1.7 (2025-04-21)
+
+- spwglue: fix a failure due to not-quite-correct `unsafe` Rust code (#10,
+  @pkgw). Also rework the `.npy` file parser to use much more modern `nom`,
+  although this should not result in any observable behavior changes.
+
+The DOI of this release is [10.5281/zenodo.15258375][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.15258375
+
+
 # rubbl-rxpackage 0.1.6 (2025-04-20)
 
 - Update to the latest version of Rubbl and its dependencies; this

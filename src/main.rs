@@ -106,7 +106,7 @@ pub fn do_show_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> R
 
         Some(("version-doi", _)) => {
             // For releases, this will be rewritten to the real version DOI:
-            let doi = "10.5281/zenodo.15251887";
+            let doi = "10.5281/zenodo.15258375";
 
             if doi.starts_with("xx.") {
                 rn_warning!(
