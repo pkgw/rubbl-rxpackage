@@ -32,8 +32,15 @@ mod mini_npy_parser {
     use super::*;
     use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
     use ndarray::{Array, Dimension};
-    use nom::character::complete::digit1;
-    use nom::*;
+    use nom::{
+        branch::alt,
+        bytes::complete::tag,
+        character::complete::{char, i64, multispace0, satisfy},
+        combinator::{map, opt},
+        multi::{many1, separated_list0},
+        sequence::{delimited, preceded, separated_pair},
+        IResult, Parser,
+    };
     use rubbl_core::num::DimFromShapeSlice;
     use std::collections::HashMap;
     use std::io::Read;
@@ -73,7 +80,20 @@ mod mini_npy_parser {
         let mut header = vec![0; aligned_len];
         stream.read_exact(&mut header[..])?;
 
-        let pyinfo = match map(&header) {
+        let endpos = header
+            .iter()
+            .position(|&c| c == b'\0')
+            .unwrap_or(aligned_len);
+
+        let header = match std::str::from_utf8(&header[..endpos]) {
+            Ok(h) => h,
+
+            Err(e) => {
+                return err_msg!("failed to convert NPY Python header into text: {}", e);
+            }
+        };
+
+        let pyinfo = match limited_py_literal(&header) {
             Ok((_, info)) => info,
 
             Err(e) => {
@@ -164,91 +184,104 @@ mod mini_npy_parser {
         Ok(unsafe { arr.assume_init() })
     }
 
-    named!(
-        item<LimitedPyLiteral>,
-        alt!(integer | boolean | string | list | map)
-    );
-
-    named!(
-        integer<LimitedPyLiteral>,
-        map!(
-            map_res!(
-                map_res!(ws!(digit1), ::std::str::from_utf8),
-                ::std::str::FromStr::from_str
-            ),
-            LimitedPyLiteral::Integer
-        )
-    );
-
-    named!(
-        boolean<LimitedPyLiteral>,
-        ws!(alt!(
-            tag!("True") => { |_| LimitedPyLiteral::Bool(true) } |
-            tag!("False") => { |_| LimitedPyLiteral::Bool(false) }
+    fn limited_py_literal(input: &str) -> IResult<&str, LimitedPyLiteral> {
+        alt((
+            integer_literal,
+            boolean_literal,
+            braindead_string_literal,
+            listlike_literal,
+            braindead_map_literal,
         ))
-    );
+        .parse(input)
+    }
 
-    named!(
-        string<LimitedPyLiteral>,
-        map!(
-            map!(
-                map_res!(
-                    ws!(alt!(
-                        delimited!(tag!("\""), is_not!("\""), tag!("\""))
-                            | delimited!(tag!("\'"), is_not!("\'"), tag!("\'"))
-                    )),
-                    ::std::str::from_utf8
-                ),
-                |s: &str| s.to_string()
+    fn integer_literal(input: &str) -> IResult<&str, LimitedPyLiteral> {
+        map(delimited(multispace0, i64, multispace0), |x: i64| {
+            LimitedPyLiteral::Integer(x)
+        })
+        .parse(input)
+    }
+
+    fn boolean_literal(input: &str) -> IResult<&str, LimitedPyLiteral> {
+        delimited(
+            multispace0,
+            alt((
+                map(tag("True"), |_| LimitedPyLiteral::Bool(true)),
+                map(tag("False"), |_| LimitedPyLiteral::Bool(false)),
+            )),
+            multispace0,
+        )
+        .parse(input)
+    }
+
+    /// This is "braindead" because we don't handle escapes at all, nor many
+    /// other facets of real Python string syntax. This is all we need for .npy
+    /// files, though.
+    fn braindead_string_text(input: &str) -> IResult<&str, String> {
+        // This is wildly inefficient since we're buffering up invididual
+        // characters in Vec rather than just using the input slice, but for
+        // these purposes I can't be bothered to do better.
+        map(
+            delimited(
+                multispace0,
+                alt((
+                    delimited(char('\"'), many1(satisfy(|c| c != '\"')), char('\"')),
+                    delimited(char('\''), many1(satisfy(|c| c != '\'')), char('\'')),
+                )),
+                multispace0,
             ),
-            LimitedPyLiteral::String
+            |chars| chars.iter().collect(),
         )
-    );
+        .parse(input)
+    }
 
-    // Note that we do not distriguish between tuples and lists.
-    named!(
-        list<LimitedPyLiteral>,
-        map!(
-            ws!(alt!(
-                delimited!(
-                    tag!("["),
-                    terminated!(separated_list!(tag!(","), item), alt!(tag!(",") | tag!(""))),
-                    tag!("]")
-                ) | delimited!(
-                    tag!("("),
-                    terminated!(separated_list!(tag!(","), item), alt!(tag!(",") | tag!(""))),
-                    tag!(")")
-                )
-            )),
-            LimitedPyLiteral::List
-        )
-    );
+    fn braindead_string_literal(input: &str) -> IResult<&str, LimitedPyLiteral> {
+        map(braindead_string_text, |s| LimitedPyLiteral::String(s)).parse(input)
+    }
 
-    // Note that we only allow string keys.
-    named!(
-        map<LimitedPyLiteral>,
-        map!(
-            ws!(delimited!(
-                tag!("{"),
-                terminated!(
-                    separated_list!(
-                        tag!(","),
-                        separated_pair!(
-                            map_opt!(string, |it| match it {
-                                LimitedPyLiteral::String(s) => Some(s),
-                                _ => None,
-                            }),
-                            tag!(":"),
-                            item
-                        )
+    /// Note that we do not distinguish between tuples and lists.
+    fn listlike_literal(input: &str) -> IResult<&str, LimitedPyLiteral> {
+        map(
+            delimited(
+                multispace0,
+                alt((
+                    delimited(
+                        char('['),
+                        separated_list0(char(','), limited_py_literal),
+                        (opt(char(',')), multispace0, char(']')),
                     ),
-                    alt!(tag!(",") | tag!(""))
-                ),
-                tag!("}")
-            )),
-            |v: Vec<_>| LimitedPyLiteral::Map(v.into_iter().collect())
+                    delimited(
+                        char('('),
+                        separated_list0(char(','), limited_py_literal),
+                        (opt(char(',')), multispace0, char(')')),
+                    ),
+                )),
+                multispace0,
+            ),
+            |items| LimitedPyLiteral::List(items),
         )
-    );
+        .parse(input)
+    }
+
+    /// Note that we only allow string keys.
+    fn braindead_map_literal(input: &str) -> IResult<&str, LimitedPyLiteral> {
+        map(
+            delimited(
+                multispace0,
+                delimited(
+                    char('{'),
+                    separated_list0(
+                        char(','),
+                        separated_pair(braindead_string_text, char(':'), limited_py_literal),
+                    ),
+                    (opt(char(',')), multispace0, char('}')),
+                ),
+                multispace0,
+            ),
+            |items| LimitedPyLiteral::Map(items.into_iter().collect()),
+        )
+        .parse(input)
+    }
 }
 
 use self::mini_npy_parser::npy_stream_to_ndarray;
