@@ -9,7 +9,7 @@ byteorder = "^1.1"
 clap = { version = "^4", features = ["cargo"] }
 itertools = "^0.14"
 ndarray = "^0.16"
-nom = "^5"
+nom = "^8"
 num-traits = "^0.2"
 pbr = "^1.0"
 rubbl_casatables = "^0.9"
