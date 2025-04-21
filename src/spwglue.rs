@@ -70,10 +70,7 @@ mod mini_npy_parser {
         let header_len = LittleEndian::read_u16(&preamble[8..]);
         let aligned_len = ((header_len as usize + 10 + 15) / 16) * 16 - 10;
 
-        let mut header = Vec::with_capacity(aligned_len);
-        unsafe {
-            header.set_len(aligned_len);
-        }
+        let mut header = vec![0; aligned_len];
         stream.read_exact(&mut header[..])?;
 
         let pyinfo = match map(&header) {
