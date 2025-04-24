@@ -92,7 +92,7 @@ pub fn make_command() -> Command {
 pub fn do_cli(matches: &ArgMatches, nbe: &mut dyn NotificationBackend) -> Result<i32> {
     let mainpath = matches.get_one::<PathBuf>("MAIN-TABLE").unwrap();
     let workpath = matches.get_one::<PathBuf>("WORK-TABLE").unwrap();
-    let incremental = matches.contains_id("incremental");
+    let incremental = *matches.get_one::<bool>("incremental").unwrap();
 
     // Open up tables and do some checking.
 
