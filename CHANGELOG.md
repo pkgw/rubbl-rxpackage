@@ -1,3 +1,15 @@
+# rubbl-rxpackage 0.1.8 (2025-04-24)
+
+- Fix `peel` (#11, @pkgw). My attempt to upgrade dependencies (specifically, the
+  `clap` argument handling library) caused this tool to always behave as if
+  `--incremental` were specified, breaking any workflows where this was *not*
+  what you wanted. Versions 0.1.6 and 0.1.7 should not be used.
+
+The DOI of this release is [10.5281/zenodo.15277584][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.15277584
+
+
 # rubbl-rxpackage 0.1.7 (2025-04-21)
 
 - spwglue: fix a failure due to not-quite-correct `unsafe` Rust code (#10,
